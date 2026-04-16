@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlowIQ
 
-## Getting Started
+FlowIQ is an intelligent workflow platform for agencies and operators managing SEO, Amazon, web design, content, social publishing, alerts, and recurring client execution. It combines structured project workflows with practical intelligence suggestions so teams can see what needs attention, why it matters, and what to do next.
 
-First, run the development server:
+The MVP includes workspace onboarding, project management, pipeline execution, topical authority mapping, content-to-social draft generation, Amazon suggestion queues, website monitoring, unified alerts, integration management, and a command-centre dashboard.
+
+## Tech Stack
+
+- Next.js 14 App Router
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- PostgreSQL
+- Prisma ORM
+- Clerk auth
+- BullMQ
+- Redis
+- Server-Sent Events
+- OpenAI GPT-4o
+- Vercel and Railway
+
+## Setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Copy environment variables:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Fill in the required values:
+
+- `DATABASE_URL`: PostgreSQL connection string
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key
+- `CLERK_SECRET_KEY`: Clerk secret key
+- `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret
+- `OPENAI_API_KEY`: OpenAI API key
+- `REDIS_URL`: Redis connection string
+- `INTEGRATION_SECRET`: long random secret for credential encryption
+- `NEXT_PUBLIC_APP_URL`: public app URL
+
+4. Run database migrations:
+
+```bash
+npm run db:migrate
+```
+
+5. Start development:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Deploy the Next.js app to Vercel. Add all environment variables from `.env.example` to the Vercel project settings.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Provision PostgreSQL and Redis on Railway. Use the Railway PostgreSQL connection string for `DATABASE_URL` and the Railway Redis connection string for `REDIS_URL`. After deployment, run Prisma migrations against the production database from a trusted environment.
 
-## Learn More
+## Notes
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The Amazon module uses realistic mock data in the MVP. Production Amazon data requires SP-API and Ads API approval. OAuth flows are placeholders for the first MVP pass and are ready to be replaced with provider-specific authorization flows.

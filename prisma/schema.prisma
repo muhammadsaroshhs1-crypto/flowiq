@@ -1,0 +1,374 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String            @id @default(cuid())
+  clerkId          String            @unique
+  email            String            @unique
+  name             String?
+  avatarUrl        String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workspaceMembers WorkspaceMember[]
+  projectMembers   ProjectMember[]
+}
+
+model Workspace {
+  id           String            @id @default(cuid())
+  name         String
+  slug         String            @unique
+  plan         Plan              @default(SOLO)
+  ownerId      String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  members      WorkspaceMember[]
+  projects     Project[]
+  integrations Integration[]
+  alerts       Alert[]
+}
+
+model WorkspaceMember {
+  id          String     @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        MemberRole
+  createdAt   DateTime   @default(now())
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Project {
+  id                 String                   @id @default(cuid())
+  workspaceId        String
+  name               String
+  clientName         String?
+  industry           Industry
+  status             ProjectStatus            @default(ACTIVE)
+  modules            String[]
+  targets            Json?
+  settings           Json?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  workspace          Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pipelines          Pipeline[]
+  alerts             Alert[]
+  members            ProjectMember[]
+  integrations       ProjectIntegration[]
+  topicMaps          TopicMap[]
+  socialQueue        SocialQueueItem[]
+  suggestions        IntelligenceSuggestion[]
+  monitoringResults  MonitoringResult[]
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+model ProjectMember {
+  id              String     @id @default(cuid())
+  projectId       String
+  userId          String
+  role            MemberRole
+  assignedModules String[]
+  project         Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model Pipeline {
+  id                String         @id @default(cuid())
+  projectId         String
+  name              String
+  description       String?
+  industry          Industry
+  moduleType        String
+  isRecurring       Boolean        @default(false)
+  recurringCadence  String?
+  status            PipelineStatus @default(ACTIVE)
+  dueDate           DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  stages            Stage[]
+  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model Stage {
+  id               String      @id @default(cuid())
+  pipelineId       String
+  name             String
+  description      String?
+  order            Int
+  status           StageStatus @default(NOT_STARTED)
+  assignedMemberId String?
+  dueDate          DateTime?
+  completedAt      DateTime?
+  tasks            Task[]
+  pipeline         Pipeline    @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId])
+  @@index([status])
+}
+
+model Task {
+  id               String     @id @default(cuid())
+  stageId          String
+  title            String
+  description      String?
+  status           TaskStatus @default(PENDING)
+  isRequired       Boolean    @default(true)
+  order            Int
+  assignedMemberId String?
+  completedAt      DateTime?
+  notes            String?
+  attachments      Json?
+  stage            Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@index([status])
+}
+
+model Alert {
+  id             String        @id @default(cuid())
+  workspaceId    String
+  projectId      String?
+  severity       AlertSeverity
+  category       AlertCategory
+  title          String
+  message        String
+  actionRequired String?
+  isRead         Boolean       @default(false)
+  isResolved     Boolean       @default(false)
+  resolvedAt     DateTime?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([severity])
+  @@index([isRead, isResolved])
+}
+
+model Integration {
+  id          String          @id @default(cuid())
+  workspaceId String
+  type        IntegrationType
+  credentials Json
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([type])
+}
+
+model ProjectIntegration {
+  id           String          @id @default(cuid())
+  projectId    String
+  type         IntegrationType
+  config       Json
+  isConnected  Boolean         @default(false)
+  lastSyncedAt DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, type])
+  @@index([type])
+}
+
+model TopicMap {
+  id              String   @id @default(cuid())
+  projectId       String
+  niche           String
+  pillarTopics    Json
+  clusterTopics   Json
+  coverageScore   Float
+  metadata        Json?
+  lastGeneratedAt DateTime
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model SocialQueueItem {
+  id          String         @id @default(cuid())
+  projectId   String
+  sourceUrl   String
+  sourceTitle String
+  platform    SocialPlatform
+  draft       String
+  status      SocialStatus   @default(PENDING_REVIEW)
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime       @default(now())
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([platform])
+}
+
+model IntelligenceSuggestion {
+  id          String             @id @default(cuid())
+  projectId   String
+  type        SuggestionType
+  priority    SuggestionPriority
+  title       String
+  description String
+  data        Json
+  status      SuggestionStatus   @default(PENDING)
+  approvedAt  DateTime?
+  approvedBy  String?
+  createdAt   DateTime           @default(now())
+  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([type])
+  @@index([priority])
+  @@index([status])
+}
+
+model MonitoringResult {
+  id        String   @id @default(cuid())
+  projectId String
+  checkType String
+  result    Json
+  status    String
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([checkType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum Plan {
+  SOLO
+  AGENCY
+  SCALE
+}
+
+enum MemberRole {
+  OWNER
+  MANAGER
+  EXECUTOR
+  VIEWER
+}
+
+enum Industry {
+  SEO
+  AMAZON
+  WEB_DESIGN
+  MULTI
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum PipelineStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum StageStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  BLOCKED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  SKIPPED
+}
+
+enum AlertSeverity {
+  CRITICAL
+  WARNING
+  INFO
+}
+
+enum AlertCategory {
+  SEO
+  AMAZON
+  WEBSITE
+  SOCIAL
+  BILLING
+  SYSTEM
+}
+
+enum IntegrationType {
+  GOOGLE_SEARCH_CONSOLE
+  GOOGLE_ANALYTICS
+  WORDPRESS
+  SHOPIFY
+  WEBFLOW
+  AMAZON
+  FLIPKART
+  ETSY
+  META
+  LINKEDIN
+  AHREFS
+  SEMRUSH
+}
+
+enum SocialPlatform {
+  LINKEDIN
+  INSTAGRAM
+  FACEBOOK
+  TWITTER
+}
+
+enum SocialStatus {
+  PENDING_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  REJECTED
+}
+
+enum SuggestionType {
+  BID_ADJUST
+  NEGATIVE_KEYWORD
+  LISTING_OPTIMIZATION
+  CONTENT_BRIEF
+  BACKLINK_OPPORTUNITY
+  WEBSITE_FIX
+}
+
+enum SuggestionPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+}

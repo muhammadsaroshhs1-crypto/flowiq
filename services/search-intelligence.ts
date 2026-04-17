@@ -76,6 +76,36 @@ export type SearchIntelligenceDashboard = {
   backlinks: IntelligenceInsight[];
 };
 
+function suggestionPriority(severity: IntelligenceInsight["severity"]) {
+  if (severity === "critical") return "HIGH";
+  if (severity === "warning") return "MEDIUM";
+  return "LOW";
+}
+
+function suggestionType(title: string) {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("backlink")) return "BACKLINK_OPPORTUNITY";
+  if (normalized.includes("title") || normalized.includes("clicks") || normalized.includes("impressions")) return "CONTENT_BRIEF";
+  return "WEBSITE_FIX";
+}
+
+async function hasRecentSearchSuggestion(projectId: string, dedupeKey: string) {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const existing = await prisma.intelligenceSuggestion.findFirst({
+    where: {
+      projectId,
+      createdAt: { gte: sevenDaysAgo },
+      data: {
+        path: ["dedupeKey"],
+        equals: dedupeKey,
+      },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(existing);
+}
+
 function configObject(config: unknown) {
   return config && typeof config === "object" && !Array.isArray(config)
     ? (config as Record<string, unknown>)
@@ -440,4 +470,46 @@ export async function getSearchIntelligenceDashboard(projectId: string): Promise
       fix: "Pitch this URL to niche blogs, partner resource pages, local directories, and existing brand mentions.",
     })),
   };
+}
+
+export async function syncSearchIntelligenceSuggestions(
+  projectId: string,
+  dashboard: SearchIntelligenceDashboard,
+) {
+  const insights = [
+    ...dashboard.opportunities,
+    ...dashboard.technicalAudit,
+    ...dashboard.backlinks,
+  ].filter((insight) => insight.severity !== "good");
+
+  const created = [];
+
+  for (const insight of insights) {
+    const dedupeKey = `search-intelligence:${insight.title}:${insight.problem}`;
+    if (await hasRecentSearchSuggestion(projectId, dedupeKey)) continue;
+
+    created.push(
+      await prisma.intelligenceSuggestion.create({
+        data: {
+          projectId,
+          type: suggestionType(insight.title) as never,
+          priority: suggestionPriority(insight.severity) as never,
+          title: insight.title,
+          description: `${insight.problem} Impact: ${insight.impact}`,
+          data: {
+            source: "search_intelligence",
+            dedupeKey,
+            impact: insight.impact,
+            fix: insight.fix,
+            severity: insight.severity,
+            dateRange: dashboard.dateRange,
+            gscPropertyUrl: dashboard.connected.gscPropertyUrl,
+            ga4PropertyId: dashboard.connected.ga4PropertyId,
+          },
+        },
+      }),
+    );
+  }
+
+  return created;
 }

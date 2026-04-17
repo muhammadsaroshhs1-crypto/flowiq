@@ -33,6 +33,12 @@ type ClusterTopic = {
   existingUrl?: string;
 };
 
+function suggestionData(data: unknown) {
+  return data && typeof data === "object" && !Array.isArray(data)
+    ? (data as { impact?: string; fix?: string; expectedImpact?: string })
+    : {};
+}
+
 export default async function ProjectIntelligencePage({
   params,
 }: {
@@ -126,6 +132,25 @@ export default async function ProjectIntelligencePage({
                       <Badge variant="outline">{suggestion.status}</Badge>
                     </div>
                   </div>
+                  {(() => {
+                    const details = suggestionData(suggestion.data);
+                    return details.fix || details.impact || details.expectedImpact ? (
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <div className="rounded-md border p-3">
+                          <p className="text-sm font-medium">Impact</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {details.impact ?? details.expectedImpact ?? "FlowIQ identified a relevant optimization opportunity."}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-sm font-medium text-amber-900">Fix</p>
+                          <p className="mt-1 text-sm text-amber-900">
+                            {details.fix ?? "Review the recommendation and apply it to the connected project workflow."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
                 </CardHeader>
               </Card>
             ))
@@ -134,12 +159,15 @@ export default async function ProjectIntelligencePage({
               <CardHeader>
                 <CardTitle>No intelligence suggestions yet</CardTitle>
                 <CardDescription>
-                  Run Amazon analysis or generate a topical map to start filling this queue with approval-ready actions.
+                  Open SEO + Analytics and click Sync now, run Amazon analysis, or generate a topical map to fill this queue with approval-ready actions.
                 </CardDescription>
               </CardHeader>
             </Card>
           )}
           <div className="flex flex-wrap gap-2">
+            <Link className={buttonVariants({ variant: "outline" })} href={`/projects/${params.projectId}/search-intelligence`}>
+              Sync SEO + Analytics
+            </Link>
             <Link className={buttonVariants({ variant: "outline" })} href={`/projects/${params.projectId}/amazon`}>
               Run Amazon analysis
             </Link>

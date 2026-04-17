@@ -2,7 +2,10 @@ import { auth } from "@clerk/nextjs/server";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { getSearchIntelligenceDashboard } from "@/services/search-intelligence";
+import {
+  getSearchIntelligenceDashboard,
+  syncSearchIntelligenceSuggestions,
+} from "@/services/search-intelligence";
 
 async function authorizeProject(clerkId: string, projectId: string) {
   const workspace = await getCurrentWorkspace(clerkId);
@@ -30,7 +33,8 @@ export async function GET(
     }
 
     const dashboard = await getSearchIntelligenceDashboard(params.projectId);
-    return Response.json({ dashboard });
+    const suggestionsCreated = await syncSearchIntelligenceSuggestions(params.projectId, dashboard);
+    return Response.json({ dashboard, suggestionsCreated: suggestionsCreated.length });
   } catch (error) {
     console.error("Failed to load search intelligence dashboard.", error);
     return Response.json(
@@ -39,4 +43,3 @@ export async function GET(
     );
   }
 }
-

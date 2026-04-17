@@ -76,11 +76,13 @@ export function IntegrationCard({
   type,
   registry,
   integration,
+  googleIntegration,
 }: {
   projectId: string;
   type: IntegrationType;
   registry: IntegrationRegistryItem;
   integration?: ProjectIntegration | null;
+  googleIntegration?: ProjectIntegration | null;
 }) {
   const router = useRouter();
   const Icon = icons[registry.icon];
@@ -93,11 +95,14 @@ export function IntegrationCard({
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingProperty, setIsSavingProperty] = useState(false);
   const integrationConfig = getIntegrationConfig(integration);
+  const googleConfig = getIntegrationConfig(googleIntegration);
   const gscSites = integrationConfig.sites ?? [];
   const selectedGscProperty = integrationConfig.propertyUrl ?? "";
   const analyticsProperties = integrationConfig.analyticsProperties ?? [];
   const selectedGa4Property = integrationConfig.ga4PropertyId ?? "";
-  const isConnected = Boolean(integration?.isConnected);
+  const analyticsPropertyName = googleConfig.ga4PropertyName || googleConfig.ga4PropertyId || "";
+  const isAnalyticsCard = type === "GOOGLE_ANALYTICS";
+  const isConnected = isAnalyticsCard ? Boolean(googleConfig.ga4PropertyId) : Boolean(integration?.isConnected);
 
   async function testConnection() {
     setIsTesting(true);
@@ -216,12 +221,19 @@ export function IntegrationCard({
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm">
               <span className={isConnected ? "text-green-700" : "text-muted-foreground"}>
-                {isConnected
+                {isAnalyticsCard
+                  ? isConnected
+                    ? "Connected through Google OAuth"
+                    : "Choose GA4 in Google Search Console connector"
+                  : isConnected
                   ? `Connected${formatSyncDate(integration?.lastSyncedAt) ? ` · Last synced ${formatSyncDate(integration?.lastSyncedAt)} UTC` : ""}`
                   : type === "GOOGLE_SEARCH_CONSOLE" && gscSites.length
                     ? "Google connected · choose property"
                   : "Not connected"}
               </span>
+              {isAnalyticsCard && analyticsPropertyName ? (
+                <p className="mt-1 text-xs text-muted-foreground">GA4 property {analyticsPropertyName}</p>
+              ) : null}
               {type === "GOOGLE_SEARCH_CONSOLE" && selectedGscProperty ? (
                 <p className="mt-1 break-all text-xs text-muted-foreground">{selectedGscProperty}</p>
               ) : null}
@@ -232,7 +244,7 @@ export function IntegrationCard({
               ) : null}
             </div>
             <Button variant={isConnected ? "outline" : "default"} onClick={() => setOpen(true)}>
-              {isConnected ? "Manage" : type === "GOOGLE_SEARCH_CONSOLE" && gscSites.length ? "Choose property" : "Connect"}
+              {isAnalyticsCard ? "How to connect" : isConnected ? "Manage" : type === "GOOGLE_SEARCH_CONSOLE" && gscSites.length ? "Choose property" : "Connect"}
             </Button>
           </div>
         </CardContent>
@@ -264,7 +276,16 @@ export function IntegrationCard({
           ) : null}
 
           {step === 2 ? (
-            type === "GOOGLE_SEARCH_CONSOLE" ? (
+            isAnalyticsCard ? (
+              <div className="space-y-3 rounded-lg border p-4">
+                <p className="text-sm text-muted-foreground">
+                  GA4 uses the same Google OAuth connection as Search Console. Reconnect Google from the Google Search Console card, then choose the matching GA4 property there.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Current GA4 property: {analyticsPropertyName || "none selected"}
+                </p>
+              </div>
+            ) : type === "GOOGLE_SEARCH_CONSOLE" ? (
               <div className="space-y-3 rounded-lg border p-4">
                 {gscSites.length ? (
                   <>
@@ -377,7 +398,7 @@ export function IntegrationCard({
             <Button variant="outline" disabled={step === 1} onClick={() => setStep((current) => Math.max(1, current - 1))}>
               Back
             </Button>
-            {type === "GOOGLE_SEARCH_CONSOLE" && step === 2 ? null : step < 3 ? (
+            {(type === "GOOGLE_SEARCH_CONSOLE" || isAnalyticsCard) && step === 2 ? null : step < 3 ? (
               <Button onClick={() => setStep((current) => current + 1)}>Continue</Button>
             ) : step === 3 ? (
               <Button onClick={testConnection} disabled={isTesting}>

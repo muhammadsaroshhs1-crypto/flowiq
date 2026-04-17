@@ -28,6 +28,7 @@ export default async function ProjectIntegrationsPage({
   const integrations = await prisma.projectIntegration.findMany({
     where: { projectId: params.projectId },
   });
+  const googleIntegration = integrations.find((integration) => integration.type === "GOOGLE_SEARCH_CONSOLE");
 
   return (
     <section className="space-y-6">
@@ -44,6 +45,7 @@ export default async function ProjectIntegrationsPage({
             type={type}
             registry={INTEGRATION_REGISTRY[type]}
             integration={integrations.find((integration) => integration.type === type)}
+            googleIntegration={googleIntegration}
           />
         ))}
       </div>

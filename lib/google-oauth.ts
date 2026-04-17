@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 const STATE_SEPARATOR = ".";
 
 export const GOOGLE_SEARCH_CONSOLE_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+export const GOOGLE_ANALYTICS_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
+export const GOOGLE_OAUTH_SCOPES = `${GOOGLE_SEARCH_CONSOLE_SCOPE} ${GOOGLE_ANALYTICS_SCOPE}`;
 
 function getSigningSecret() {
   const secret = process.env.INTEGRATION_SECRET;

@@ -27,6 +27,23 @@ type SearchConsoleSitesResponse = {
   }>;
 };
 
+type AnalyticsAccountSummariesResponse = {
+  accountSummaries?: Array<{
+    displayName?: string;
+    propertySummaries?: Array<{
+      property: string;
+      displayName?: string;
+      propertyType?: string;
+    }>;
+  }>;
+};
+
+type AnalyticsPropertyOption = {
+  propertyId: string;
+  displayName: string;
+  accountName: string;
+};
+
 function redirectToProject(requestUrl: string, projectId: string, status: "connected" | "error", reason?: string) {
   const url = new URL(`/projects/${projectId}/integrations`, requestUrl);
   url.searchParams.set("gsc", status);
@@ -108,11 +125,35 @@ export async function GET(request: Request) {
   }
 
   const sites = sitesData.siteEntry ?? [];
+  let analyticsProperties: AnalyticsPropertyOption[] = [];
+  try {
+    const analyticsResponse = await fetch("https://analyticsadmin.googleapis.com/v1beta/accountSummaries", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    if (analyticsResponse.ok) {
+      const analyticsData = (await analyticsResponse.json()) as AnalyticsAccountSummariesResponse;
+      analyticsProperties =
+        analyticsData.accountSummaries?.flatMap((account) =>
+          account.propertySummaries?.map((property) => ({
+            propertyId: property.property.replace("properties/", ""),
+            displayName: property.displayName ?? property.property,
+            accountName: account.displayName ?? "Google Analytics",
+          })) ?? [],
+        ) ?? [];
+    } else {
+      console.warn("Google Analytics property discovery skipped.", await analyticsResponse.text());
+    }
+  } catch (error) {
+    console.warn("Google Analytics property discovery failed.", error);
+  }
   const expiresAt =
     typeof tokenData.expires_in === "number"
       ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
       : null;
   const selectedSite = sites.length === 1 ? sites[0].siteUrl : "";
+  const selectedAnalyticsPropertyId =
+    analyticsProperties.length === 1 ? analyticsProperties[0].propertyId : "";
 
   await prisma.projectIntegration.upsert({
     where: {
@@ -127,6 +168,8 @@ export async function GET(request: Request) {
       config: {
         propertyUrl: selectedSite,
         sites,
+        analyticsProperties,
+        ga4PropertyId: selectedAnalyticsPropertyId,
         encryptedCredentials: encryptCredentials({
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
@@ -142,6 +185,8 @@ export async function GET(request: Request) {
       config: {
         propertyUrl: selectedSite,
         sites,
+        analyticsProperties,
+        ga4PropertyId: selectedAnalyticsPropertyId,
         encryptedCredentials: encryptCredentials({
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,

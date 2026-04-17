@@ -8,11 +8,18 @@ import { createAlert } from "@/services/alert-service";
 
 const propertySchema = z.object({
   propertyUrl: z.string().min(1),
+  ga4PropertyId: z.string().trim().optional(),
 });
 
 type SearchConsoleSite = {
   siteUrl: string;
   permissionLevel: string;
+};
+
+type AnalyticsPropertyOption = {
+  propertyId: string;
+  displayName: string;
+  accountName: string;
 };
 
 function configObject(config: unknown) {
@@ -75,7 +82,13 @@ export async function PATCH(
 
     const config = configObject(integration.config);
     const sites = Array.isArray(config.sites) ? (config.sites as SearchConsoleSite[]) : [];
+    const analyticsProperties = Array.isArray(config.analyticsProperties)
+      ? (config.analyticsProperties as AnalyticsPropertyOption[])
+      : [];
     const selectedSite = sites.find((site) => site.siteUrl === parsed.data.propertyUrl);
+    const selectedAnalyticsProperty = parsed.data.ga4PropertyId
+      ? analyticsProperties.find((property) => property.propertyId === parsed.data.ga4PropertyId)
+      : null;
 
     if (!selectedSite) {
       return Response.json({ error: "Selected property was not returned by Google.", code: "GSC_PROPERTY_NOT_FOUND" }, { status: 400 });
@@ -88,6 +101,8 @@ export async function PATCH(
           ...config,
           propertyUrl: selectedSite.siteUrl,
           propertyPermissionLevel: selectedSite.permissionLevel,
+          ga4PropertyId: selectedAnalyticsProperty?.propertyId ?? config.ga4PropertyId ?? "",
+          ga4PropertyName: selectedAnalyticsProperty?.displayName ?? config.ga4PropertyName ?? "",
         },
         isConnected: true,
         lastSyncedAt: new Date(),
@@ -107,6 +122,7 @@ export async function PATCH(
         integration: "GOOGLE_SEARCH_CONSOLE",
         propertyUrl: selectedSite.siteUrl,
         permissionLevel: selectedSite.permissionLevel,
+        ga4PropertyId: selectedAnalyticsProperty?.propertyId,
       },
     });
 

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import {
   createGoogleOAuthState,
   getGoogleRedirectUri,
-  GOOGLE_SEARCH_CONSOLE_SCOPE,
+  GOOGLE_OAUTH_SCOPES,
 } from "@/lib/google-oauth";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -46,11 +46,10 @@ export async function GET(request: Request) {
   authorizationUrl.searchParams.set("client_id", clientId);
   authorizationUrl.searchParams.set("redirect_uri", getGoogleRedirectUri(origin));
   authorizationUrl.searchParams.set("response_type", "code");
-  authorizationUrl.searchParams.set("scope", GOOGLE_SEARCH_CONSOLE_SCOPE);
+  authorizationUrl.searchParams.set("scope", GOOGLE_OAUTH_SCOPES);
   authorizationUrl.searchParams.set("access_type", "offline");
   authorizationUrl.searchParams.set("prompt", "consent");
   authorizationUrl.searchParams.set("state", createGoogleOAuthState({ projectId, clerkId: userId }));
 
   return NextResponse.redirect(authorizationUrl);
 }
-

@@ -2,6 +2,7 @@
 
 import type { IntegrationType, ProjectIntegration } from "@prisma/client";
 import { BarChart3, Globe, LinkIcon, Search, ShoppingCart, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -42,9 +43,16 @@ const supportCopy = {
 
 type IntegrationConfig = {
   propertyUrl?: string;
+  ga4PropertyId?: string;
+  ga4PropertyName?: string;
   sites?: Array<{
     siteUrl: string;
     permissionLevel: string;
+  }>;
+  analyticsProperties?: Array<{
+    propertyId: string;
+    displayName: string;
+    accountName: string;
   }>;
 };
 
@@ -52,6 +60,15 @@ function getIntegrationConfig(integration?: ProjectIntegration | null): Integrat
   return integration?.config && typeof integration.config === "object" && !Array.isArray(integration.config)
     ? (integration.config as IntegrationConfig)
     : {};
+}
+
+function formatSyncDate(value: Date | string | null | undefined) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toISOString().slice(0, 16).replace("T", " ");
 }
 
 export function IntegrationCard({
@@ -65,17 +82,21 @@ export function IntegrationCard({
   registry: IntegrationRegistryItem;
   integration?: ProjectIntegration | null;
 }) {
+  const router = useRouter();
   const Icon = icons[registry.icon];
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState<Record<string, string>>({});
   const [selectedPropertyUrl, setSelectedPropertyUrl] = useState("");
+  const [selectedGa4PropertyId, setSelectedGa4PropertyId] = useState("");
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingProperty, setIsSavingProperty] = useState(false);
   const integrationConfig = getIntegrationConfig(integration);
   const gscSites = integrationConfig.sites ?? [];
   const selectedGscProperty = integrationConfig.propertyUrl ?? "";
+  const analyticsProperties = integrationConfig.analyticsProperties ?? [];
+  const selectedGa4Property = integrationConfig.ga4PropertyId ?? "";
   const isConnected = Boolean(integration?.isConnected);
 
   async function testConnection() {
@@ -142,7 +163,10 @@ export function IntegrationCard({
       const response = await fetch(`/api/projects/${projectId}/integrations/google-search-console/property`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ propertyUrl }),
+        body: JSON.stringify({
+          propertyUrl,
+          ga4PropertyId: selectedGa4PropertyId || selectedGa4Property || undefined,
+        }),
       });
       const data = (await response.json()) as { error?: string };
 
@@ -153,7 +177,7 @@ export function IntegrationCard({
 
       toast.success("Search Console property connected");
       setOpen(false);
-      window.location.reload();
+      router.refresh();
     } catch {
       toast.error("Could not save Search Console property");
     } finally {
@@ -193,13 +217,18 @@ export function IntegrationCard({
             <div className="text-sm">
               <span className={isConnected ? "text-green-700" : "text-muted-foreground"}>
                 {isConnected
-                  ? `Connected${integration?.lastSyncedAt ? ` · Last synced ${new Date(integration.lastSyncedAt).toLocaleString()}` : ""}`
+                  ? `Connected${formatSyncDate(integration?.lastSyncedAt) ? ` · Last synced ${formatSyncDate(integration?.lastSyncedAt)} UTC` : ""}`
                   : type === "GOOGLE_SEARCH_CONSOLE" && gscSites.length
                     ? "Google connected · choose property"
                   : "Not connected"}
               </span>
               {type === "GOOGLE_SEARCH_CONSOLE" && selectedGscProperty ? (
                 <p className="mt-1 break-all text-xs text-muted-foreground">{selectedGscProperty}</p>
+              ) : null}
+              {type === "GOOGLE_SEARCH_CONSOLE" && selectedGa4Property ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  GA4 property {integrationConfig.ga4PropertyName || selectedGa4Property}
+                </p>
               ) : null}
             </div>
             <Button variant={isConnected ? "outline" : "default"} onClick={() => setOpen(true)}>
@@ -254,6 +283,26 @@ export function IntegrationCard({
                         </option>
                       ))}
                     </select>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">GA4 property for behavior data</label>
+                      <select
+                        className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        value={selectedGa4PropertyId || selectedGa4Property}
+                        onChange={(event) => setSelectedGa4PropertyId(event.target.value)}
+                      >
+                        <option value="">No GA4 property selected</option>
+                        {analyticsProperties.map((property) => (
+                          <option key={property.propertyId} value={property.propertyId}>
+                            {property.displayName} · {property.accountName} · {property.propertyId}
+                          </option>
+                        ))}
+                      </select>
+                      {!analyticsProperties.length ? (
+                        <p className="text-xs text-muted-foreground">
+                          No GA4 properties were returned. Enable Google Analytics Admin API/Data API and reconnect Google.
+                        </p>
+                      ) : null}
+                    </div>
                     <Button type="button" onClick={saveGoogleSearchConsoleProperty} disabled={isSavingProperty}>
                       {isSavingProperty ? "Saving..." : "Save selected property"}
                     </Button>

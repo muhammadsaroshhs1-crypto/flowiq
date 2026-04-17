@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 const baseTabs = [
   { href: "", label: "Overview" },
   { href: "/pipelines", label: "Pipelines" },
+  { href: "/search-intelligence", label: "SEO + Analytics" },
   { href: "/intelligence", label: "Intelligence" },
   { href: "/integrations", label: "Integrations" },
 ];
@@ -45,7 +46,7 @@ export default async function ProjectLayout({
       : null,
   ].filter(Boolean) as Array<{ href: string; label: string }>;
 
-  const tabs = [...baseTabs.slice(0, 3), ...industryTabs, baseTabs[3]];
+  const tabs = [...baseTabs.slice(0, 4), ...industryTabs, baseTabs[4]];
 
   return (
     <ProjectProvider

@@ -21,14 +21,14 @@ export function InviteMemberForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, role }),
       });
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json()) as { error?: string; message?: string };
 
       if (!response.ok || data.error) {
         toast.error(data.error ?? "Could not send invite");
         return;
       }
 
-      toast.success("Invitation sent");
+      toast.success(data.message ?? "Invitation sent");
       setEmail("");
       setRole("EXECUTOR");
     } catch {

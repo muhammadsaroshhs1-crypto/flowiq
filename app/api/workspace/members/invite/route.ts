@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 
-import { inviteMember } from "@/lib/workspace";
+import { inviteMember, WorkspaceInviteError } from "@/lib/workspace";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkspace } from "@/lib/workspace";
 
@@ -66,11 +66,25 @@ export async function POST(request: Request) {
     }
 
     const requestOrigin = request.headers.get("origin") ?? undefined;
-    await inviteMember(workspace.id, parsed.data.email, parsed.data.role, requestOrigin);
+    const result = await inviteMember(workspace.id, parsed.data.email, parsed.data.role, requestOrigin);
 
-    return Response.json({ ok: true });
+    return Response.json({
+      ok: true,
+      message:
+        result.mode === "added_existing_user"
+          ? "Existing FlowIQ user added to this workspace."
+          : "Invitation sent.",
+      mode: result.mode,
+    });
   } catch (error) {
     console.error("Failed to invite workspace member.", error);
+    if (error instanceof WorkspaceInviteError) {
+      return Response.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+
     return Response.json(
       { error: "Could not send invitation.", code: "INVITE_FAILED" },
       { status: 500 },

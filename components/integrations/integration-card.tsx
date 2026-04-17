@@ -40,6 +40,20 @@ const supportCopy = {
   mock_validation: "Mock MVP",
 };
 
+type IntegrationConfig = {
+  propertyUrl?: string;
+  sites?: Array<{
+    siteUrl: string;
+    permissionLevel: string;
+  }>;
+};
+
+function getIntegrationConfig(integration?: ProjectIntegration | null): IntegrationConfig {
+  return integration?.config && typeof integration.config === "object" && !Array.isArray(integration.config)
+    ? (integration.config as IntegrationConfig)
+    : {};
+}
+
 export function IntegrationCard({
   projectId,
   type,
@@ -55,8 +69,13 @@ export function IntegrationCard({
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState<Record<string, string>>({});
+  const [selectedPropertyUrl, setSelectedPropertyUrl] = useState("");
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingProperty, setIsSavingProperty] = useState(false);
+  const integrationConfig = getIntegrationConfig(integration);
+  const gscSites = integrationConfig.sites ?? [];
+  const selectedGscProperty = integrationConfig.propertyUrl ?? "";
   const isConnected = Boolean(integration?.isConnected);
 
   async function testConnection() {
@@ -110,6 +129,38 @@ export function IntegrationCard({
     }
   }
 
+  async function saveGoogleSearchConsoleProperty() {
+    const propertyUrl = selectedPropertyUrl || selectedGscProperty;
+    if (!propertyUrl) {
+      toast.error("Choose a Search Console property first");
+      return;
+    }
+
+    setIsSavingProperty(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/integrations/google-search-console/property`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyUrl }),
+      });
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok || data.error) {
+        toast.error(data.error ?? "Could not save Search Console property");
+        return;
+      }
+
+      toast.success("Search Console property connected");
+      setOpen(false);
+      window.location.reload();
+    } catch {
+      toast.error("Could not save Search Console property");
+    } finally {
+      setIsSavingProperty(false);
+    }
+  }
+
   return (
     <>
       <Card className="rounded-lg">
@@ -143,11 +194,16 @@ export function IntegrationCard({
               <span className={isConnected ? "text-green-700" : "text-muted-foreground"}>
                 {isConnected
                   ? `Connected${integration?.lastSyncedAt ? ` · Last synced ${new Date(integration.lastSyncedAt).toLocaleString()}` : ""}`
+                  : type === "GOOGLE_SEARCH_CONSOLE" && gscSites.length
+                    ? "Google connected · choose property"
                   : "Not connected"}
               </span>
+              {type === "GOOGLE_SEARCH_CONSOLE" && selectedGscProperty ? (
+                <p className="mt-1 break-all text-xs text-muted-foreground">{selectedGscProperty}</p>
+              ) : null}
             </div>
             <Button variant={isConnected ? "outline" : "default"} onClick={() => setOpen(true)}>
-              {isConnected ? "Manage" : "Connect"}
+              {isConnected ? "Manage" : type === "GOOGLE_SEARCH_CONSOLE" && gscSites.length ? "Choose property" : "Connect"}
             </Button>
           </div>
         </CardContent>
@@ -181,17 +237,51 @@ export function IntegrationCard({
           {step === 2 ? (
             type === "GOOGLE_SEARCH_CONSOLE" ? (
               <div className="space-y-3 rounded-lg border p-4">
-                <p className="text-sm text-muted-foreground">
-                  Connect your Google account and grant read-only Search Console access. FlowIQ will save the token encrypted.
-                </p>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    window.location.href = `/api/integrations/google-search-console/start?projectId=${projectId}`;
-                  }}
-                >
-                  Connect with Google
-                </Button>
+                {gscSites.length ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Choose which Google Search Console property belongs to this FlowIQ project.
+                    </p>
+                    <select
+                      className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                      value={selectedPropertyUrl || selectedGscProperty}
+                      onChange={(event) => setSelectedPropertyUrl(event.target.value)}
+                    >
+                      <option value="">Select property</option>
+                      {gscSites.map((site) => (
+                        <option key={site.siteUrl} value={site.siteUrl}>
+                          {site.siteUrl} · {site.permissionLevel}
+                        </option>
+                      ))}
+                    </select>
+                    <Button type="button" onClick={saveGoogleSearchConsoleProperty} disabled={isSavingProperty}>
+                      {isSavingProperty ? "Saving..." : "Save selected property"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        window.location.href = `/api/integrations/google-search-console/start?projectId=${projectId}`;
+                      }}
+                    >
+                      Reconnect Google account
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Connect your Google account and grant read-only Search Console access. FlowIQ will then ask which property to use for this project.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        window.location.href = `/api/integrations/google-search-console/start?projectId=${projectId}`;
+                      }}
+                    >
+                      Connect with Google
+                    </Button>
+                  </>
+                )}
               </div>
             ) : registry.authType === "oauth2" ? (
               <div className="rounded-lg border p-4">

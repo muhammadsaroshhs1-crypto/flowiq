@@ -6,6 +6,7 @@ import { encryptCredentials } from "@/lib/encryption";
 import { getGoogleRedirectUri, parseGoogleOAuthState } from "@/lib/google-oauth";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { createAlert } from "@/services/alert-service";
 
 export const runtime = "nodejs";
 
@@ -107,11 +108,11 @@ export async function GET(request: Request) {
   }
 
   const sites = sitesData.siteEntry ?? [];
-  const selectedSite = sites[0]?.siteUrl ?? "";
   const expiresAt =
     typeof tokenData.expires_in === "number"
       ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
       : null;
+  const selectedSite = sites.length === 1 ? sites[0].siteUrl : "";
 
   await prisma.projectIntegration.upsert({
     where: {
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
           tokenType: tokenData.token_type,
         }),
       },
-      isConnected: true,
+      isConnected: Boolean(selectedSite),
       lastSyncedAt: new Date(),
     },
     update: {
@@ -149,11 +150,54 @@ export async function GET(request: Request) {
           tokenType: tokenData.token_type,
         }),
       },
-      isConnected: true,
+      isConnected: Boolean(selectedSite),
       lastSyncedAt: new Date(),
     },
   });
 
-  return redirectToProject(requestUrl, state.projectId, "connected");
-}
+  if (selectedSite) {
+    await createAlert({
+      workspaceId: workspace.id,
+      projectId: state.projectId,
+      severity: "INFO",
+      category: "SEO",
+      title: `Google Search Console connected: ${selectedSite}`,
+      message: `${selectedSite} is now connected to this FlowIQ project.`,
+      actionRequired:
+        "No immediate action is required. Next, use this connected property to power topical authority checks, SEO alerts, and reporting.",
+      metadata: {
+        integration: "GOOGLE_SEARCH_CONSOLE",
+        propertyUrl: selectedSite,
+      },
+    });
+  } else if (sites.length === 0) {
+    await createAlert({
+      workspaceId: workspace.id,
+      projectId: state.projectId,
+      severity: "WARNING",
+      category: "SEO",
+      title: "Google Search Console connected with no properties",
+      message: "Google connected successfully, but this Google account did not return any Search Console properties.",
+      actionRequired:
+        "Open Google Search Console with the same Google account and verify or request access to the website you want to connect. Then reconnect Google Search Console in FlowIQ.",
+      metadata: { integration: "GOOGLE_SEARCH_CONSOLE" },
+    });
+  } else if (!selectedSite) {
+    await createAlert({
+      workspaceId: workspace.id,
+      projectId: state.projectId,
+      severity: "INFO",
+      category: "SEO",
+      title: "Choose a Google Search Console property",
+      message: `${sites.length} Search Console properties were found. Select the correct property for this FlowIQ project.`,
+      actionRequired:
+        "Go to Project → Integrations → Google Search Console, click Choose property, select the website for this project, and save it.",
+      metadata: {
+        integration: "GOOGLE_SEARCH_CONSOLE",
+        propertyCount: sites.length,
+      },
+    });
+  }
 
+  return redirectToProject(requestUrl, state.projectId, selectedSite ? "connected" : "connected", selectedSite ? undefined : "choose_property");
+}

@@ -3,6 +3,18 @@ import type { MemberRole, Workspace, WorkspaceMember } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
+export class WorkspaceInviteError extends Error {
+  code: string;
+  status: number;
+
+  constructor(message: string, code = "INVITE_FAILED", status = 500) {
+    super(message);
+    this.name = "WorkspaceInviteError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
 export type WorkspaceWithMembers = Workspace & {
   members: Array<WorkspaceMember & { user: { id: string; clerkId: string; email: string; name: string | null; avatarUrl: string | null } }>;
 };
@@ -68,25 +80,75 @@ export async function inviteMember(
   email: string,
   role: MemberRole,
   appUrl?: string,
-): Promise<void> {
+): Promise<{ mode: "added_existing_user" | "invited" }> {
+  const normalizedEmail = email.trim().toLowerCase();
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
     select: { id: true, name: true },
   });
 
   if (!workspace) {
-    throw new Error("Workspace not found.");
+    throw new WorkspaceInviteError("Workspace not found.", "WORKSPACE_NOT_FOUND", 404);
+  }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true },
+  });
+
+  if (existingUser) {
+    const existingMember = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: existingUser.id,
+        },
+      },
+    });
+
+    if (existingMember) {
+      throw new WorkspaceInviteError("This person is already a member of this workspace.", "ALREADY_MEMBER", 409);
+    }
+
+    await prisma.workspaceMember.create({
+      data: {
+        workspaceId,
+        userId: existingUser.id,
+        role,
+      },
+    });
+
+    return { mode: "added_existing_user" };
   }
 
   const client = await clerkClient();
 
-  await client.invitations.createInvitation({
-    emailAddress: email,
-    publicMetadata: {
-      workspaceId,
-      workspaceName: workspace.name,
-      role,
-    },
-    redirectUrl: new URL("/onboarding", appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").toString(),
-  });
+  try {
+    await client.invitations.createInvitation({
+      emailAddress: normalizedEmail,
+      publicMetadata: {
+        workspaceId,
+        workspaceName: workspace.name,
+        role,
+      },
+      redirectUrl: new URL("/onboarding", appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").toString(),
+    });
+  } catch (error) {
+    const clerkMessage =
+      typeof error === "object" &&
+      error !== null &&
+      "errors" in error &&
+      Array.isArray((error as { errors?: unknown }).errors)
+        ? ((error as { errors: Array<{ message?: string; longMessage?: string }> }).errors[0]?.longMessage ??
+          (error as { errors: Array<{ message?: string; longMessage?: string }> }).errors[0]?.message)
+        : undefined;
+
+    throw new WorkspaceInviteError(
+      clerkMessage ?? "Clerk rejected the invitation. Check that your Vercel domain is allowed in Clerk and the email is valid.",
+      "CLERK_INVITE_FAILED",
+      400,
+    );
+  }
+
+  return { mode: "invited" };
 }

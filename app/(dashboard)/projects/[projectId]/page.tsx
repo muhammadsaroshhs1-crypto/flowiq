@@ -1,10 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { formatDistanceToNow } from "date-fns";
 import { Globe, Layers, Pencil, Search, ShoppingCart } from "lucide-react";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -168,29 +169,62 @@ export default async function ProjectOverviewPage({
         </TabsContent>
 
         <TabsContent value="pipelines">
-          <Placeholder title="Pipelines" text="Pipeline execution is built in Step 5." />
+          <NavigationCard
+            title="Pipelines"
+            text="Create template-based workflows, assign stages, and track task completion."
+            href={`/projects/${params.projectId}/pipelines`}
+            buttonText="Open pipelines"
+          />
         </TabsContent>
         <TabsContent value="intelligence">
-          <Placeholder title="Intelligence" text="SEO and Amazon intelligence arrive in later steps." />
+          <NavigationCard
+            title="Intelligence"
+            text="Generate topical maps, review content gaps, and open project suggestion queues."
+            href={`/projects/${params.projectId}/intelligence`}
+            buttonText="Open intelligence"
+          />
         </TabsContent>
         <TabsContent value="integrations">
-          <Placeholder title="Integrations" text="Project connections are built in Step 11." />
+          <NavigationCard
+            title="Integrations"
+            text="Connect Google Search Console and manage project-level data sources."
+            href={`/projects/${params.projectId}/integrations`}
+            buttonText="Open integrations"
+          />
         </TabsContent>
         <TabsContent value="settings">
-          <Placeholder title="Settings" text="Project settings will be expanded as modules land." />
+          <NavigationCard
+            title="Project settings"
+            text="Workspace settings, team invites, and member roles are managed from Settings."
+            href="/settings"
+            buttonText="Open settings"
+          />
         </TabsContent>
       </Tabs>
     </section>
   );
 }
 
-function Placeholder({ title, text }: { title: string; text: string }) {
+function NavigationCard({
+  title,
+  text,
+  href,
+  buttonText,
+}: {
+  title: string;
+  text: string;
+  href: string;
+  buttonText: string;
+}) {
   return (
     <Card className="rounded-lg">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{text}</CardDescription>
       </CardHeader>
+      <CardContent>
+        <Link className={buttonVariants()} href={href}>{buttonText}</Link>
+      </CardContent>
     </Card>
   );
 }

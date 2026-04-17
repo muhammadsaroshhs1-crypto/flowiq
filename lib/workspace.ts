@@ -67,6 +67,7 @@ export async function inviteMember(
   workspaceId: string,
   email: string,
   role: MemberRole,
+  appUrl?: string,
 ): Promise<void> {
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
@@ -86,6 +87,6 @@ export async function inviteMember(
       workspaceName: workspace.name,
       role,
     },
-    redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/onboarding`,
+    redirectUrl: new URL("/onboarding", appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").toString(),
   });
 }

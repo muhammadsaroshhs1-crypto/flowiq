@@ -74,6 +74,14 @@ export default async function AmazonPage({ params, searchParams }: AmazonPagePro
   const targets = (project.targets ?? {}) as AmazonTargets;
   const listings = getMockAmazonListings();
   const campaigns = getMockAmazonCampaigns();
+  const totalSpend = campaigns.reduce((sum, campaign) => sum + campaign.spend, 0);
+  const totalSales = campaigns.reduce((sum, campaign) => sum + campaign.sales, 0);
+  const totalClicks = campaigns.reduce((sum, campaign) => sum + campaign.clicks, 0);
+  const blendedAcos = totalSales ? Math.round((totalSpend / totalSales) * 1000) / 10 : 0;
+  const averageRating =
+    listings.length
+      ? Math.round((listings.reduce((sum, listing) => sum + listing.reviewRating, 0) / listings.length) * 10) / 10
+      : 0;
 
   return (
     <section className="space-y-6">
@@ -195,14 +203,45 @@ export default async function AmazonPage({ params, searchParams }: AmazonPagePro
           })}
         </TabsContent>
 
-        <TabsContent value="reports">
+        <TabsContent value="reports" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card className="rounded-lg">
+              <CardHeader>
+                <CardTitle>${totalSpend.toLocaleString()}</CardTitle>
+                <CardDescription>Mock ad spend analysed</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card className="rounded-lg">
+              <CardHeader>
+                <CardTitle>${totalSales.toLocaleString()}</CardTitle>
+                <CardDescription>Mock attributed sales</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card className="rounded-lg">
+              <CardHeader>
+                <CardTitle>{blendedAcos}%</CardTitle>
+                <CardDescription>Blended ACOS</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card className="rounded-lg">
+              <CardHeader>
+                <CardTitle>{averageRating}</CardTitle>
+                <CardDescription>Average listing rating</CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
           <Card className="rounded-lg">
             <CardHeader>
-              <CardTitle>Reports</CardTitle>
+              <CardTitle>MVP report status</CardTitle>
               <CardDescription>
-                Amazon reporting exports will be built after the core intelligence loop is stable.
+                This report currently uses the FlowIQ mock Amazon data generator. Connect Amazon SP-API in production to replace these numbers with live Seller Central and Ads data.
               </CardDescription>
             </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Badge variant="outline">{campaigns.length} campaigns</Badge>
+              <Badge variant="outline">{listings.length} listings</Badge>
+              <Badge variant="outline">{totalClicks.toLocaleString()} clicks</Badge>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

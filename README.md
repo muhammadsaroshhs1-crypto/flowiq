@@ -40,6 +40,8 @@ cp .env.example .env.local
 - `CLERK_SECRET_KEY`: Clerk secret key
 - `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret
 - `OPENAI_API_KEY`: OpenAI API key
+- `GOOGLE_OAUTH_CLIENT_ID`: Google OAuth web client ID for Search Console
+- `GOOGLE_OAUTH_CLIENT_SECRET`: Google OAuth web client secret for Search Console
 - `REDIS_URL`: Redis connection string
 - `INTEGRATION_SECRET`: long random secret for credential encryption
 - `NEXT_PUBLIC_APP_URL`: public app URL

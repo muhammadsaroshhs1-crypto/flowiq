@@ -34,6 +34,12 @@ const icons = {
   link: LinkIcon,
 };
 
+const supportCopy = {
+  live_oauth: "Live OAuth",
+  manual_validation: "Manual MVP",
+  mock_validation: "Mock MVP",
+};
+
 export function IntegrationCard({
   projectId,
   type,
@@ -118,7 +124,12 @@ export function IntegrationCard({
                 <CardDescription>{registry.description}</CardDescription>
               </div>
             </div>
-            <Badge variant="outline">{registry.category}</Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge variant="outline">{registry.category}</Badge>
+              <Badge variant={registry.supportLevel === "live_oauth" ? "default" : "outline"}>
+                {supportCopy[registry.supportLevel]}
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -150,18 +161,39 @@ export function IntegrationCard({
           </DialogHeader>
 
           {step === 1 ? (
-            <ol className="space-y-3">
-              {registry.setupSteps.map((item, index) => (
-                <li key={item} className="rounded-md border p-3 text-sm">
-                  <span className="font-medium">Step {index + 1}: </span>
-                  {item}
-                </li>
-              ))}
-            </ol>
+            <div className="space-y-3">
+              {registry.supportLevel !== "live_oauth" ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  This connector uses MVP validation right now. It can save configuration for testing, but full vendor OAuth/data sync is not production-ready yet.
+                </div>
+              ) : null}
+              <ol className="space-y-3">
+                {registry.setupSteps.map((item, index) => (
+                  <li key={item} className="rounded-md border p-3 text-sm">
+                    <span className="font-medium">Step {index + 1}: </span>
+                    {item}
+                  </li>
+                ))}
+              </ol>
+            </div>
           ) : null}
 
           {step === 2 ? (
-            registry.authType === "oauth2" ? (
+            type === "GOOGLE_SEARCH_CONSOLE" ? (
+              <div className="space-y-3 rounded-lg border p-4">
+                <p className="text-sm text-muted-foreground">
+                  Connect your Google account and grant read-only Search Console access. FlowIQ will save the token encrypted.
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = `/api/integrations/google-search-console/start?projectId=${projectId}`;
+                  }}
+                >
+                  Connect with Google
+                </Button>
+              </div>
+            ) : registry.authType === "oauth2" ? (
               <div className="rounded-lg border p-4">
                 <p className="text-sm text-muted-foreground">
                   OAuth redirects are placeholders in the MVP. Paste a token or account identifier below to continue testing.
@@ -206,7 +238,7 @@ export function IntegrationCard({
             <Button variant="outline" disabled={step === 1} onClick={() => setStep((current) => Math.max(1, current - 1))}>
               Back
             </Button>
-            {step < 3 ? (
+            {type === "GOOGLE_SEARCH_CONSOLE" && step === 2 ? null : step < 3 ? (
               <Button onClick={() => setStep((current) => current + 1)}>Continue</Button>
             ) : step === 3 ? (
               <Button onClick={testConnection} disabled={isTesting}>

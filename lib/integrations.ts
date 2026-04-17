@@ -9,6 +9,7 @@ export type IntegrationRegistryItem = {
   category: IntegrationCategory;
   icon: "search" | "globe" | "shopping-cart" | "bar-chart" | "users" | "link";
   authType: IntegrationAuthType;
+  supportLevel: "live_oauth" | "manual_validation" | "mock_validation";
   unlocks: string[];
   setupSteps: string[];
   credentialFields?: string[];
@@ -21,9 +22,10 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "SEO",
     icon: "search",
     authType: "oauth2",
+    supportLevel: "live_oauth",
     unlocks: ["topical_authority", "rank_tracking", "index_monitoring"],
-    setupSteps: ["Connect Google account", "Select property (site)", "Grant read access"],
-    credentialFields: ["accessToken", "propertyUrl"],
+    setupSteps: ["Connect Google account", "Grant read-only Search Console access", "FlowIQ saves your available properties"],
+    credentialFields: ["propertyUrl"],
   },
   WORDPRESS: {
     name: "WordPress",
@@ -31,6 +33,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "CMS",
     icon: "globe",
     authType: "api_key",
+    supportLevel: "manual_validation",
     unlocks: ["social_sync", "content_briefs", "plugin_monitoring"],
     setupSteps: [
       "Install FlowIQ WordPress plugin OR generate Application Password",
@@ -44,6 +47,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "MARKETPLACE",
     icon: "shopping-cart",
     authType: "api_key",
+    supportLevel: "mock_validation",
     unlocks: ["amazon_intelligence", "listing_monitoring", "bid_suggestions"],
     setupSteps: ["Add FlowIQ as a Selling Partner API app", "Enter Seller ID + MWS credentials"],
     credentialFields: ["sellerId", "marketplaceId", "refreshToken"],
@@ -54,6 +58,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "ANALYTICS",
     icon: "bar-chart",
     authType: "oauth2",
+    supportLevel: "manual_validation",
     unlocks: ["traffic_reporting", "conversion_monitoring"],
     setupSteps: ["Connect Google account", "Select GA4 property", "Grant read access"],
     credentialFields: ["accessToken", "propertyId"],
@@ -64,6 +69,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "SOCIAL",
     icon: "users",
     authType: "oauth2",
+    supportLevel: "manual_validation",
     unlocks: ["social_sync", "social_queue"],
     setupSteps: ["Connect Meta account", "Select pages", "Grant publishing permissions"],
     credentialFields: ["accessToken", "pageId"],
@@ -74,6 +80,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "SOCIAL",
     icon: "users",
     authType: "oauth2",
+    supportLevel: "manual_validation",
     unlocks: ["social_sync", "linkedin_posts"],
     setupSteps: ["Connect LinkedIn account", "Select organization", "Grant posting access"],
     credentialFields: ["accessToken", "organizationId"],
@@ -84,6 +91,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "CMS",
     icon: "shopping-cart",
     authType: "api_key",
+    supportLevel: "manual_validation",
     unlocks: ["website_monitoring", "product_content_sync"],
     setupSteps: ["Create private app", "Enter shop domain and token"],
     credentialFields: ["siteUrl", "shopDomain", "accessToken"],
@@ -94,6 +102,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "CMS",
     icon: "globe",
     authType: "api_key",
+    supportLevel: "manual_validation",
     unlocks: ["website_monitoring", "content_briefs"],
     setupSteps: ["Create API token", "Enter site ID and site URL"],
     credentialFields: ["siteUrl", "siteId", "apiToken"],
@@ -104,6 +113,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "SEO",
     icon: "link",
     authType: "api_key",
+    supportLevel: "manual_validation",
     unlocks: ["backlink_monitoring", "keyword_gap_analysis"],
     setupSteps: ["Create API token", "Enter token in FlowIQ"],
     credentialFields: ["apiToken"],
@@ -114,6 +124,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "SEO",
     icon: "search",
     authType: "api_key",
+    supportLevel: "manual_validation",
     unlocks: ["keyword_gap_analysis", "rank_tracking"],
     setupSteps: ["Create API key", "Enter API key in FlowIQ"],
     credentialFields: ["apiKey"],
@@ -124,6 +135,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "MARKETPLACE",
     icon: "shopping-cart",
     authType: "api_key",
+    supportLevel: "manual_validation",
     unlocks: ["marketplace_monitoring"],
     setupSteps: ["Create seller API credentials", "Enter seller ID and token"],
     credentialFields: ["sellerId", "apiToken"],
@@ -134,6 +146,7 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
     category: "MARKETPLACE",
     icon: "shopping-cart",
     authType: "oauth2",
+    supportLevel: "manual_validation",
     unlocks: ["marketplace_monitoring"],
     setupSteps: ["Connect Etsy account", "Select shop", "Grant listing access"],
     credentialFields: ["accessToken", "shopId"],

@@ -65,7 +65,8 @@ export async function POST(request: Request) {
       );
     }
 
-    await inviteMember(workspace.id, parsed.data.email, parsed.data.role);
+    const requestOrigin = request.headers.get("origin") ?? undefined;
+    await inviteMember(workspace.id, parsed.data.email, parsed.data.role, requestOrigin);
 
     return Response.json({ ok: true });
   } catch (error) {

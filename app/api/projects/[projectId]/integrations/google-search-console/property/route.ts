@@ -8,7 +8,11 @@ import { createAlert } from "@/services/alert-service";
 
 const propertySchema = z.object({
   propertyUrl: z.string().min(1),
-  ga4PropertyId: z.string().trim().optional(),
+  ga4PropertyId: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/^properties\//, ""))
+    .optional(),
 });
 
 type SearchConsoleSite = {
@@ -86,9 +90,18 @@ export async function PATCH(
       ? (config.analyticsProperties as AnalyticsPropertyOption[])
       : [];
     const selectedSite = sites.find((site) => site.siteUrl === parsed.data.propertyUrl);
-    const selectedAnalyticsProperty = parsed.data.ga4PropertyId
-      ? analyticsProperties.find((property) => property.propertyId === parsed.data.ga4PropertyId)
+    const selectedGa4PropertyId = parsed.data.ga4PropertyId || "";
+    const selectedAnalyticsProperty = selectedGa4PropertyId
+      ? analyticsProperties.find((property) => property.propertyId === selectedGa4PropertyId)
       : null;
+    const ga4PropertyId =
+      selectedAnalyticsProperty?.propertyId ??
+      selectedGa4PropertyId ??
+      (typeof config.ga4PropertyId === "string" ? config.ga4PropertyId : "");
+    const existingGa4PropertyName = typeof config.ga4PropertyName === "string" ? config.ga4PropertyName : "";
+    const ga4PropertyName =
+      selectedAnalyticsProperty?.displayName ??
+      (ga4PropertyId ? `GA4 property ${ga4PropertyId}` : existingGa4PropertyName);
 
     if (!selectedSite) {
       return Response.json({ error: "Selected property was not returned by Google.", code: "GSC_PROPERTY_NOT_FOUND" }, { status: 400 });
@@ -101,8 +114,8 @@ export async function PATCH(
           ...config,
           propertyUrl: selectedSite.siteUrl,
           propertyPermissionLevel: selectedSite.permissionLevel,
-          ga4PropertyId: selectedAnalyticsProperty?.propertyId ?? config.ga4PropertyId ?? "",
-          ga4PropertyName: selectedAnalyticsProperty?.displayName ?? config.ga4PropertyName ?? "",
+          ga4PropertyId,
+          ga4PropertyName,
         },
         isConnected: true,
         lastSyncedAt: new Date(),
@@ -122,7 +135,7 @@ export async function PATCH(
         integration: "GOOGLE_SEARCH_CONSOLE",
         propertyUrl: selectedSite.siteUrl,
         permissionLevel: selectedSite.permissionLevel,
-        ga4PropertyId: selectedAnalyticsProperty?.propertyId,
+        ga4PropertyId,
       },
     });
 

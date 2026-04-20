@@ -3,6 +3,13 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import {
+  checkBrokenLinks,
+  checkCoreWebVitals,
+  checkSSLExpiry,
+  checkSiteUptime,
+  generateMonitoringAlert,
+} from "@/services/website-monitor";
 import { getMonitoringQueue } from "@/workers/scheduler";
 
 const scheduleSchema = z.object({
@@ -15,6 +22,7 @@ const scheduleSchema = z.object({
     "BACKUP_CHECK",
     "FORM_CHECK",
   ]),
+  runNow: z.boolean().optional(),
 });
 
 function readSiteUrl(config: unknown) {
@@ -24,6 +32,104 @@ function readSiteUrl(config: unknown) {
 
   const siteUrl = (config as { siteUrl?: unknown }).siteUrl;
   return typeof siteUrl === "string" ? siteUrl : null;
+}
+
+async function saveMonitoringResult(
+  projectId: string,
+  checkType: z.infer<typeof scheduleSchema>["checkType"],
+  result: unknown,
+  status: "ok" | "warning" | "critical",
+) {
+  return prisma.monitoringResult.create({
+    data: {
+      projectId,
+      checkType,
+      result: result as never,
+      status,
+    },
+  });
+}
+
+async function runMonitoringCheckNow(input: {
+  projectId: string;
+  checkType: z.infer<typeof scheduleSchema>["checkType"];
+  siteUrl: string;
+  domain: string;
+}) {
+  const { projectId, checkType, siteUrl, domain } = input;
+
+  if (checkType === "UPTIME_CHECK") {
+    const result = await checkSiteUptime(siteUrl);
+    const status = result.isUp ? "ok" : "critical";
+    await saveMonitoringResult(projectId, checkType, result, status);
+
+    if (!result.isUp) {
+      await generateMonitoringAlert(projectId, checkType, "CRITICAL", result);
+    }
+
+    return { status, result };
+  }
+
+  if (checkType === "SSL_CHECK") {
+    const result = await checkSSLExpiry(domain);
+    const status =
+      result.daysUntilExpiry < 7
+        ? "critical"
+        : result.daysUntilExpiry < 30
+          ? "warning"
+          : "ok";
+    await saveMonitoringResult(projectId, checkType, result, status);
+
+    if (status !== "ok") {
+      await generateMonitoringAlert(projectId, checkType, status === "critical" ? "CRITICAL" : "WARNING", {
+        ...result,
+        expiryDate: result.expiresAt.toISOString().slice(0, 10),
+      });
+    }
+
+    return { status, result };
+  }
+
+  if (checkType === "CWV_CHECK") {
+    const result = await checkCoreWebVitals(siteUrl);
+    const status = result.score < 50 || result.lcp > 4 ? "warning" : "ok";
+    await saveMonitoringResult(projectId, checkType, result, status);
+
+    if (status !== "ok") {
+      await generateMonitoringAlert(projectId, checkType, "WARNING", {
+        oldValue: "previous",
+        newValue: result.lcp,
+        date: new Date().toISOString().slice(0, 10),
+        score: result.score,
+      });
+    }
+
+    return { status, result };
+  }
+
+  if (checkType === "LINK_CHECK") {
+    const result = await checkBrokenLinks(siteUrl);
+    const status = result.length > 0 ? "warning" : "ok";
+    await saveMonitoringResult(projectId, checkType, result, status);
+
+    if (result.length > 0) {
+      await generateMonitoringAlert(projectId, checkType, "WARNING", {
+        count: result.length,
+        page: result[0]?.foundOn,
+        brokenUrl: result[0]?.url,
+        links: result,
+      });
+    }
+
+    return { status, result };
+  }
+
+  const result = {
+    message: `${checkType.replaceAll("_", " ").toLowerCase()} completed.`,
+    checkedAt: new Date().toISOString(),
+  };
+  await saveMonitoringResult(projectId, checkType, result, "ok");
+  return { status: "ok", result };
 }
 
 export async function POST(request: Request) {
@@ -89,13 +195,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const queue = getMonitoringQueue();
-    const job = await queue.add(parsed.data.checkType, {
+    const jobData = {
       projectId: project.id,
       integrationId: integration.id,
       siteUrl,
       domain: new URL(siteUrl).hostname,
-    });
+    };
+
+    if (parsed.data.runNow) {
+      const check = await runMonitoringCheckNow({
+        projectId: project.id,
+        checkType: parsed.data.checkType,
+        siteUrl,
+        domain: jobData.domain,
+      });
+
+      return Response.json({
+        message: `Check completed with ${check.status} status.`,
+        status: check.status,
+        result: check.result,
+      });
+    }
+
+    const queue = getMonitoringQueue();
+    const job = await queue.add(parsed.data.checkType, jobData);
 
     return Response.json({
       jobId: job.id,

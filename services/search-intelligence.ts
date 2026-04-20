@@ -45,6 +45,11 @@ export type IntelligenceInsight = {
   problem: string;
   impact: string;
   fix: string;
+  resources?: Array<{
+    name: string;
+    url: string;
+    reason: string;
+  }>;
 };
 
 export type SearchIntelligenceDashboard = {
@@ -224,6 +229,150 @@ function gaMetric(row: NonNullable<GaRunReportResponse["rows"]>[number], index: 
 
 function gaDimension(row: NonNullable<GaRunReportResponse["rows"]>[number], index: number) {
   return row.dimensionValues?.[index]?.value ?? "";
+}
+
+const foundationalAuthorityResources = [
+  {
+    name: "Google Business Profile",
+    url: "https://www.google.com/business/",
+    reason: "Essential local trust signal for businesses with a physical service area or office.",
+  },
+  {
+    name: "Bing Places",
+    url: "https://www.bingplaces.com/",
+    reason: "Creates a matching business entity on Bing and supports local discovery.",
+  },
+  {
+    name: "Apple Business Connect",
+    url: "https://businessconnect.apple.com/",
+    reason: "Helps the brand appear accurately in Apple Maps and Apple local surfaces.",
+  },
+  {
+    name: "LinkedIn Company Page",
+    url: "https://www.linkedin.com/company/setup/new/",
+    reason: "Strong brand profile for B2B trust, team proof, and company entity consistency.",
+  },
+  {
+    name: "Crunchbase",
+    url: "https://www.crunchbase.com/",
+    reason: "Useful for company/entity credibility, especially for SaaS, agencies, and startups.",
+  },
+  {
+    name: "Yelp for Business",
+    url: "https://business.yelp.com/",
+    reason: "Helpful for local service businesses and review/profile consistency.",
+  },
+  {
+    name: "Trustpilot",
+    url: "https://business.trustpilot.com/",
+    reason: "Review profile that can support brand trust and conversion credibility.",
+  },
+  {
+    name: "Clutch",
+    url: "https://clutch.co/get-listed",
+    reason: "High-value profile for agencies, consultants, software, and B2B service providers.",
+  },
+  {
+    name: "GoodFirms",
+    url: "https://www.goodfirms.co/get-listed",
+    reason: "Relevant for agencies, software companies, app development, and digital services.",
+  },
+  {
+    name: "DesignRush",
+    url: "https://www.designrush.com/agency/register",
+    reason: "Useful for web design, branding, marketing, and development agency visibility.",
+  },
+  {
+    name: "Sortlist",
+    url: "https://www.sortlist.com/",
+    reason: "Agency marketplace profile for marketing, design, and development services.",
+  },
+  {
+    name: "Product Hunt",
+    url: "https://www.producthunt.com/",
+    reason: "Useful for SaaS/tools when launching a real product or public feature.",
+  },
+];
+
+function authorityResourcesForPage(pageUrl: string) {
+  const normalized = pageUrl.toLowerCase();
+  const resources = foundationalAuthorityResources.slice(0, 6);
+
+  if (
+    normalized.includes("web") ||
+    normalized.includes("design") ||
+    normalized.includes("seo") ||
+    normalized.includes("marketing") ||
+    normalized.includes("agency")
+  ) {
+    return [
+      ...resources,
+      foundationalAuthorityResources.find((resource) => resource.name === "Clutch"),
+      foundationalAuthorityResources.find((resource) => resource.name === "GoodFirms"),
+      foundationalAuthorityResources.find((resource) => resource.name === "DesignRush"),
+      foundationalAuthorityResources.find((resource) => resource.name === "Sortlist"),
+    ].filter(Boolean) as typeof foundationalAuthorityResources;
+  }
+
+  return resources;
+}
+
+function buildBacklinkInsights(pageRows: GscRow[], propertyUrl: string): IntelligenceInsight[] {
+  if (!propertyUrl) {
+    return [
+      {
+        severity: "warning",
+        title: "Connect Search Console before backlink planning",
+        problem: "FlowIQ needs the website's Search Console pages before it can prioritize link-building targets.",
+        impact: "Without page-level search data, backlink work becomes generic and harder to connect to ranking gains.",
+        fix: "Connect Google Search Console, select the exact website property, then run SEO + Analytics sync again.",
+        resources: foundationalAuthorityResources.slice(0, 4),
+      },
+    ];
+  }
+
+  if (!pageRows.length) {
+    return [
+      {
+        severity: "warning",
+        title: "Build foundational authority profiles",
+        problem: "Search Console did not return enough page data yet for page-specific backlink targeting.",
+        impact: "A new or low-data site still needs basic trust signals before deeper link-building campaigns make sense.",
+        fix: "Create or improve profiles on Google Business Profile, Bing Places, relevant local directories, niche association pages, partner websites, and social brand profiles. Use the same business name, website URL, services, and location everywhere.",
+        resources: foundationalAuthorityResources.slice(0, 8),
+      },
+      {
+        severity: "warning",
+        title: "Create one linkable asset",
+        problem: "The site needs a page that other websites have a clear reason to reference.",
+        impact: "Backlinks are easier to earn when the target page has original value, such as data, a checklist, pricing guide, calculator, or local resource.",
+        fix: "Publish one strong resource page for the core service, then pitch it to niche blogs, partner pages, local publications, and resource list owners.",
+        resources: foundationalAuthorityResources.slice(7, 12),
+      },
+    ];
+  }
+
+  return pageRows.slice(0, 5).map((row) => {
+    const page = row.keys?.[0] ?? propertyUrl;
+    const impressions = row.impressions ?? 0;
+    const clicks = row.clicks ?? 0;
+    const position = row.position ?? 0;
+    const ctr = row.ctr ?? 0;
+    const needsAuthority = impressions > 50 && position > 8;
+    const needsClickSupport = impressions > 100 && ctr < 0.03;
+
+    return {
+      severity: needsAuthority || needsClickSupport ? "warning" : "good",
+      title: needsAuthority ? "Authority gap backlink opportunity" : "Backlink support opportunity",
+      problem: `${page} has ${numberFormat(impressions)} impressions, ${numberFormat(clicks)} clicks, and an average position of ${Math.round(position * 10) / 10 || "-"}.`,
+      impact: needsAuthority
+        ? "This page is visible but needs stronger external authority to push into more valuable ranking positions."
+        : "Relevant mentions and backlinks can help this page defend rankings and build topical trust.",
+      fix:
+        "Prioritize this URL for outreach. Look for niche blogs, local directories, supplier or partner pages, resource lists, guest post targets, and unlinked brand mentions. Pitch the page as a useful reference, not just as a homepage link.",
+      resources: authorityResourcesForPage(page).slice(0, 8),
+    };
+  });
 }
 
 export async function getSearchIntelligenceDashboard(projectId: string): Promise<SearchIntelligenceDashboard> {
@@ -462,13 +611,7 @@ export async function getSearchIntelligenceDashboard(projectId: string): Promise
       },
     ],
     opportunities,
-    backlinks: topPages.slice(0, 5).map((page) => ({
-      severity: "warning",
-      title: "Backlink support opportunity",
-      problem: `${page.page} has organic visibility and can benefit from stronger authority.`,
-      impact: "Relevant backlinks can help this page defend rankings and move higher for related queries.",
-      fix: "Pitch this URL to niche blogs, partner resource pages, local directories, and existing brand mentions.",
-    })),
+    backlinks: buildBacklinkInsights(pageRows, propertyUrl),
   };
 }
 
@@ -502,6 +645,7 @@ export async function syncSearchIntelligenceSuggestions(
             impact: insight.impact,
             fix: insight.fix,
             severity: insight.severity,
+            resources: insight.resources ?? [],
             dateRange: dashboard.dateRange,
             gscPropertyUrl: dashboard.connected.gscPropertyUrl,
             ga4PropertyId: dashboard.connected.ga4PropertyId,

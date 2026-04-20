@@ -24,7 +24,7 @@ export function ManualCheckForm({ projectId }: { projectId: string }) {
       const response = await fetch("/api/monitoring/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, checkType }),
+        body: JSON.stringify({ projectId, checkType, runNow: true }),
       });
       const data = (await response.json()) as { message?: string; error?: string };
 
@@ -33,7 +33,8 @@ export function ManualCheckForm({ projectId }: { projectId: string }) {
         return;
       }
 
-      toast.success(data.message ?? "Check queued");
+      toast.success(data.message ?? "Check completed");
+      window.location.reload();
     } catch {
       toast.error("Could not queue check");
     } finally {
@@ -55,7 +56,7 @@ export function ManualCheckForm({ projectId }: { projectId: string }) {
         ))}
       </select>
       <Button onClick={queueCheck} disabled={isQueueing}>
-        {isQueueing ? "Queueing..." : "Run check"}
+        {isQueueing ? "Checking..." : "Run check"}
       </Button>
     </div>
   );

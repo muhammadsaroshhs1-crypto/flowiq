@@ -319,9 +319,19 @@ export function IntegrationCard({
                         ))}
                       </select>
                       {!analyticsProperties.length ? (
-                        <p className="text-xs text-muted-foreground">
-                          No GA4 properties were returned. Enable Google Analytics Admin API/Data API and reconnect Google.
-                        </p>
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            No GA4 properties were returned automatically. Enable Google Analytics Admin API/Data API and reconnect Google, or paste the GA4 property ID below.
+                          </p>
+                          <Input
+                            placeholder="Example: 123456789"
+                            value={selectedGa4PropertyId}
+                            onChange={(event) => setSelectedGa4PropertyId(event.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            You can find this in Google Analytics → Admin → Property details → Property ID.
+                          </p>
+                        </div>
                       ) : null}
                     </div>
                     <Button type="button" onClick={saveGoogleSearchConsoleProperty} disabled={isSavingProperty}>

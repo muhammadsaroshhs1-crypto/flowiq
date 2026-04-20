@@ -159,3 +159,6 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
 };
 
 export const INTEGRATION_TYPES = Object.keys(INTEGRATION_REGISTRY) as IntegrationType[];
+export const ACTIVE_INTEGRATION_TYPES = INTEGRATION_TYPES.filter(
+  (type) => !["AHREFS", "SEMRUSH"].includes(type),
+);

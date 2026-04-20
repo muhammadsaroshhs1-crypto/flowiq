@@ -126,7 +126,11 @@ export async function checkSSLExpiry(domain: string): Promise<SSLResult> {
 
 export async function checkCoreWebVitals(url: string): Promise<CWVResult> {
   const response = await axios.get("https://www.googleapis.com/pagespeedonline/v5/runPagespeed", {
-    params: { url, strategy: "mobile" },
+    params: {
+      url,
+      strategy: "mobile",
+      ...(process.env.GOOGLE_PAGESPEED_API_KEY ? { key: process.env.GOOGLE_PAGESPEED_API_KEY } : {}),
+    },
     timeout: 20_000,
   });
 

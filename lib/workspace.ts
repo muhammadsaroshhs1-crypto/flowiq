@@ -126,12 +126,13 @@ export async function inviteMember(
   try {
     await client.invitations.createInvitation({
       emailAddress: normalizedEmail,
+      ignoreExisting: true,
       publicMetadata: {
         workspaceId,
         workspaceName: workspace.name,
         role,
       },
-      redirectUrl: new URL("/onboarding", appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").toString(),
+      redirectUrl: new URL("/sign-up", appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").toString(),
     });
   } catch (error) {
     const clerkMessage =

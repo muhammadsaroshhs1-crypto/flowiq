@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 
 import { IntegrationCard } from "@/components/integrations/integration-card";
-import { INTEGRATION_REGISTRY, INTEGRATION_TYPES } from "@/lib/integrations";
+import { ACTIVE_INTEGRATION_TYPES, INTEGRATION_REGISTRY } from "@/lib/integrations";
 import { prisma } from "@/lib/prisma";
 import { getProjectById } from "@/lib/projects";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -38,7 +38,7 @@ export default async function ProjectIntegrationsPage({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {INTEGRATION_TYPES.map((type) => (
+        {ACTIVE_INTEGRATION_TYPES.map((type) => (
           <IntegrationCard
             key={type}
             projectId={params.projectId}

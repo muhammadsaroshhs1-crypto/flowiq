@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { INTEGRATION_REGISTRY, INTEGRATION_TYPES } from "@/lib/integrations";
+import { ACTIVE_INTEGRATION_TYPES, INTEGRATION_REGISTRY } from "@/lib/integrations";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkspace } from "@/lib/workspace";
 
@@ -29,7 +29,7 @@ export default async function WorkspaceIntegrationsPage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  const visibleTypes = INTEGRATION_TYPES.filter((type) =>
+  const visibleTypes = ACTIVE_INTEGRATION_TYPES.filter((type) =>
     ["WORDPRESS", "SHOPIFY", "WEBFLOW", "AMAZON", "GOOGLE_SEARCH_CONSOLE", "GOOGLE_ANALYTICS", "META", "LINKEDIN"].includes(type),
   );
 

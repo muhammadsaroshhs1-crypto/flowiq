@@ -3,12 +3,12 @@ import type { IntegrationType } from "@prisma/client";
 import { z } from "zod";
 
 import { encryptCredentials } from "@/lib/encryption";
-import { INTEGRATION_TYPES } from "@/lib/integrations";
+import { ACTIVE_INTEGRATION_TYPES } from "@/lib/integrations";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkspace } from "@/lib/workspace";
 
 const integrationSchema = z.object({
-  type: z.enum(INTEGRATION_TYPES as [IntegrationType, ...IntegrationType[]]),
+  type: z.enum(ACTIVE_INTEGRATION_TYPES as [IntegrationType, ...IntegrationType[]]),
   config: z.record(z.string(), z.unknown()),
 });
 

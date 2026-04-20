@@ -20,7 +20,7 @@ const tabs = [
   { id: "analytics", label: "Analytics Overview" },
   { id: "technical", label: "Technical Audit" },
   { id: "opportunities", label: "Opportunities & Insights" },
-  { id: "backlinks", label: "Backlinks" },
+  { id: "backlinks", label: "Authority Opportunities" },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
@@ -155,6 +155,28 @@ function InsightList({
               <p className="text-sm font-medium text-amber-900">Fix</p>
               <p className="mt-1 text-sm text-amber-900">{insight.fix}</p>
             </div>
+            {insight.resources?.length ? (
+              <div className="rounded-md border p-3 md:col-span-2">
+                <p className="text-sm font-medium">Relevant places to research</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {insight.resources.map((resource) => (
+                    <a
+                      key={`${insight.title}-${resource.name}`}
+                      href={resource.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-md border p-3 transition-colors hover:bg-muted"
+                    >
+                      <span className="text-sm font-medium underline underline-offset-4">{resource.name}</span>
+                      <p className="mt-1 text-xs text-muted-foreground">{resource.reason}</p>
+                    </a>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  These are research targets, not guaranteed backlinks. Prioritize quality, relevance, and real brand profiles.
+                </p>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ))}

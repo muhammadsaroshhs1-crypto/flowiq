@@ -8,6 +8,12 @@ type ClerkEmailAddress = {
   email_address: string;
 };
 
+type ClerkPublicMetadata = {
+  workspaceId?: unknown;
+  workspaceName?: unknown;
+  role?: unknown;
+};
+
 type ClerkUserCreatedEvent = {
   type: "user.created";
   data: {
@@ -17,6 +23,7 @@ type ClerkUserCreatedEvent = {
     first_name?: string | null;
     last_name?: string | null;
     image_url?: string | null;
+    public_metadata?: ClerkPublicMetadata;
   };
 };
 
@@ -89,21 +96,58 @@ export async function POST(request: Request) {
   const name = [userCreatedEvent.data.first_name, userCreatedEvent.data.last_name]
     .filter(Boolean)
     .join(" ");
+  const inviteMetadata = userCreatedEvent.data.public_metadata ?? {};
+  const invitedWorkspaceId =
+    typeof inviteMetadata.workspaceId === "string" ? inviteMetadata.workspaceId : "";
+  const invitedRole =
+    inviteMetadata.role === "MANAGER" ||
+    inviteMetadata.role === "EXECUTOR" ||
+    inviteMetadata.role === "VIEWER"
+      ? inviteMetadata.role
+      : null;
 
   try {
-    await prisma.user.upsert({
-      where: { clerkId: userCreatedEvent.data.id },
-      create: {
-        clerkId: userCreatedEvent.data.id,
-        email,
-        name: name || null,
-        avatarUrl: userCreatedEvent.data.image_url ?? null,
-      },
-      update: {
-        email,
-        name: name || null,
-        avatarUrl: userCreatedEvent.data.image_url ?? null,
-      },
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.upsert({
+        where: { clerkId: userCreatedEvent.data.id },
+        create: {
+          clerkId: userCreatedEvent.data.id,
+          email,
+          name: name || null,
+          avatarUrl: userCreatedEvent.data.image_url ?? null,
+        },
+        update: {
+          email,
+          name: name || null,
+          avatarUrl: userCreatedEvent.data.image_url ?? null,
+        },
+      });
+
+      if (invitedWorkspaceId && invitedRole) {
+        const workspace = await tx.workspace.findUnique({
+          where: { id: invitedWorkspaceId },
+          select: { id: true },
+        });
+
+        if (workspace) {
+          await tx.workspaceMember.upsert({
+            where: {
+              workspaceId_userId: {
+                workspaceId: workspace.id,
+                userId: user.id,
+              },
+            },
+            create: {
+              workspaceId: workspace.id,
+              userId: user.id,
+              role: invitedRole,
+            },
+            update: {
+              role: invitedRole,
+            },
+          });
+        }
+      }
     });
 
     return Response.json({ received: true });

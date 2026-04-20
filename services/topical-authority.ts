@@ -78,6 +78,117 @@ function calculateCoverageScore(map: TopicMapResponse) {
   return totalTopics ? Math.round((existingTopics / totalTopics) * 100) : 0;
 }
 
+function humanizeSlug(value: string) {
+  return value
+    .replace(/^https?:\/\//, "")
+    .replace(/[#?].*$/, "")
+    .split("/")
+    .filter(Boolean)
+    .slice(-1)[0]
+    ?.replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || value;
+}
+
+function topicExists(topic: string, pages: ExistingPage[]) {
+  const normalizedTopic = topic.toLowerCase();
+  return pages.find((page) => {
+    const haystack = `${page.url} ${page.title} ${page.content ?? ""}`.toLowerCase();
+    return normalizedTopic
+      .split(/\s+/)
+      .filter((word) => word.length > 3)
+      .some((word) => haystack.includes(word));
+  });
+}
+
+function buildFallbackTopicMap(input: TopicMapInput): TopicMapResponse {
+  const niche = input.niche.trim();
+  const audience = input.targetAudience.trim();
+  const existingPageTopics = input.existingPages.slice(0, 4).map((page) => humanizeSlug(page.title || page.url));
+  const lowerNiche = niche.toLowerCase();
+  const isLocal = /\b(boston|karachi|london|new york|dubai|near me|local)\b/i.test(niche);
+  const isAgency = /\b(agency|marketing|seo|web design|design|development)\b/i.test(niche);
+  const isEcommerce = /\b(shopify|ecommerce|amazon|store|product)\b/i.test(niche);
+
+  const basePillars = [
+    `${niche} services`,
+    `${niche} pricing and packages`,
+    `${niche} case studies`,
+    `${niche} strategy for ${audience}`,
+  ];
+
+  if (isLocal) basePillars.push(`${niche} local market guide`);
+  if (isAgency) basePillars.push(`${niche} process and deliverables`);
+  if (isEcommerce) basePillars.push(`${niche} growth and conversion optimization`);
+  basePillars.push(...existingPageTopics);
+
+  const uniquePillars = Array.from(new Set(basePillars)).slice(0, 6);
+  const pillarTopics = uniquePillars.map<PillarTopic>((topic, index) => {
+    const existingPage = topicExists(topic, input.existingPages);
+    return {
+      topic,
+      targetKeyword: topic.toLowerCase(),
+      searchIntent: index === 1 ? "Commercial investigation" : index === 2 ? "Trust and proof" : "Informational and commercial",
+      priority: index < 3 ? "high" : index < 5 ? "medium" : "low",
+      exists: Boolean(existingPage),
+      existingUrl: existingPage?.url,
+    };
+  });
+
+  const clusterSeeds: Array<[string, string, number]> = [
+    ["How to choose", `How to choose a ${niche} provider`, 1400],
+    ["Cost", `${niche} cost breakdown`, 1200],
+    ["Checklist", `${niche} checklist for ${audience}`, 1300],
+    ["Mistakes", `${niche} mistakes to avoid`, 1200],
+    ["Comparison", `${niche} vs alternatives`, 1500],
+    ["Timeline", `${niche} timeline and process`, 1100],
+    ["Examples", `${niche} examples and case studies`, 1400],
+    ["Questions", `${niche} FAQs`, 900],
+  ];
+
+  const clusterTopics = uniquePillars.flatMap((pillar, pillarIndex) =>
+    clusterSeeds.slice(0, pillarIndex < 3 ? 4 : 2).map<ClusterTopic>(([, topic, wordCount], index) => {
+      const existingPage = topicExists(topic, input.existingPages);
+      return {
+        pillar,
+        topic,
+        targetKeyword: topic.toLowerCase(),
+        wordCount,
+        priority: pillarIndex < 2 && index < 2 ? "high" : index < 3 ? "medium" : "low",
+        status: existingPage ? "existing" : "gap",
+        existingUrl: existingPage?.url,
+      };
+    }),
+  );
+
+  return { pillarTopics, clusterTopics };
+}
+
+function isOpenAIQuotaError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { status?: number; code?: string; message?: string };
+  return candidate.status === 429 || candidate.code === "insufficient_quota" || candidate.message?.includes("quota");
+}
+
+async function saveTopicMap(input: TopicMapInput, parsed: TopicMapResponse, metadata: Record<string, unknown>) {
+  const coverageScore = calculateCoverageScore(parsed);
+
+  return prisma.topicMap.create({
+    data: {
+      projectId: input.projectId,
+      niche: input.niche,
+      pillarTopics: parsed.pillarTopics,
+      clusterTopics: parsed.clusterTopics,
+      coverageScore,
+      lastGeneratedAt: new Date(),
+      metadata: {
+        ...metadata,
+        targetAudience: input.targetAudience,
+        existingPageCount: input.existingPages.length,
+      },
+    },
+  });
+}
+
 export async function generateTopicMap(input: TopicMapInput): Promise<TopicMap> {
   const latestMap = await prisma.topicMap.findFirst({
     where: { projectId: input.projectId },
@@ -116,28 +227,19 @@ export async function generateTopicMap(input: TopicMapInput): Promise<TopicMap> 
     }
 
     const parsed = parseTopicMapResponse(rawResponse);
-    const coverageScore = calculateCoverageScore(parsed);
-
-    return prisma.topicMap.create({
-      data: {
-        projectId: input.projectId,
-        niche: input.niche,
-        pillarTopics: parsed.pillarTopics,
-        clusterTopics: parsed.clusterTopics,
-        coverageScore,
-        lastGeneratedAt: new Date(),
-        metadata: {
-          rawOpenAIResponse: rawResponse,
-          targetAudience: input.targetAudience,
-          existingPageCount: input.existingPages.length,
-        },
-      },
+    return saveTopicMap(input, parsed, {
+      generationMode: "openai",
+      rawOpenAIResponse: rawResponse,
     });
   } catch (error) {
     console.error("Failed to generate topic map.", error);
-    throw new Error(
-      error instanceof Error ? error.message : "Could not generate topic map.",
-    );
+    const fallback = buildFallbackTopicMap(input);
+    return saveTopicMap(input, fallback, {
+      generationMode: "fallback",
+      fallbackReason: isOpenAIQuotaError(error)
+        ? "OpenAI quota was unavailable, so FlowIQ generated a rules-based topical map."
+        : "OpenAI generation failed, so FlowIQ generated a rules-based topical map.",
+    });
   }
 }
 
@@ -177,8 +279,49 @@ export async function generateContentBrief(input: ContentBriefInput): Promise<st
     return brief;
   } catch (error) {
     console.error("Failed to generate content brief.", error);
-    throw new Error(
-      error instanceof Error ? error.message : "Could not generate content brief.",
-    );
+    return [
+      `# Content Brief: ${input.topic}`,
+      "",
+      `## Target Keyword`,
+      input.targetKeyword,
+      "",
+      "## Secondary Keywords",
+      `- ${input.targetKeyword} guide`,
+      `- best ${input.targetKeyword}`,
+      `- ${input.targetKeyword} cost`,
+      `- ${input.targetKeyword} checklist`,
+      `- ${input.targetKeyword} examples`,
+      "",
+      "## Search Intent",
+      "The reader wants a practical explanation, clear options, and enough proof to decide the next step.",
+      "",
+      "## Recommended Word Count",
+      "1,200-1,800 words, depending on competition and current ranking pages.",
+      "",
+      "## Suggested H2 Structure",
+      `- What is ${input.topic}?`,
+      `- Who needs ${input.topic}?`,
+      "- Main benefits and business impact",
+      "- Step-by-step process or checklist",
+      "- Cost, timeline, or comparison section",
+      "- FAQs and next action",
+      "",
+      "## Internal Link Suggestions",
+      ...(input.existingTopicUrls.length
+        ? input.existingTopicUrls.map((url) => `- Link to ${url}`)
+        : ["- Link to the main service page", "- Link to one relevant case study", "- Link to the contact or consultation page"]),
+      "",
+      "## Competitor Angle",
+      "Make the page more useful than generic competitor content by adding examples, local context, a checklist, proof, and a clear next step.",
+      "",
+      "## Meta Title Suggestions",
+      `- ${input.topic}: Complete Guide`,
+      `- ${input.targetKeyword}: Strategy, Cost, and Checklist`,
+      "",
+      "## Meta Description Suggestions",
+      `- Learn how ${input.topic.toLowerCase()} works, what to prioritize, and how to turn it into measurable business results.`,
+      "",
+      "> FlowIQ generated this fallback brief because the AI quota was unavailable. Add OpenAI billing/quota for richer AI-written briefs.",
+    ].join("\n");
   }
 }

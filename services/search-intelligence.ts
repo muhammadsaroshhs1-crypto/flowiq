@@ -294,27 +294,220 @@ const foundationalAuthorityResources = [
   },
 ];
 
+const authorityResourceGroups = {
+  local: [
+    {
+      name: "Google Business Profile",
+      url: "https://www.google.com/business/",
+      reason: "Best first profile for local visibility, reviews, maps, and service-area trust.",
+    },
+    {
+      name: "Bing Places",
+      url: "https://www.bingplaces.com/",
+      reason: "Mirrors the local entity on Bing and supports map/local discovery.",
+    },
+    {
+      name: "Apple Business Connect",
+      url: "https://businessconnect.apple.com/",
+      reason: "Improves local entity accuracy for Apple Maps and iOS searches.",
+    },
+    {
+      name: "Chamber of Commerce",
+      url: "https://www.chamberofcommerce.com/",
+      reason: "Useful for local business citations and city/service-area credibility.",
+    },
+  ],
+  agency: [
+    {
+      name: "Clutch",
+      url: "https://clutch.co/get-listed",
+      reason: "Strong fit for agency, SEO, marketing, software, design, and development service pages.",
+    },
+    {
+      name: "GoodFirms",
+      url: "https://www.goodfirms.co/get-listed",
+      reason: "Relevant profile for digital agencies, web development, and software service providers.",
+    },
+    {
+      name: "DesignRush",
+      url: "https://www.designrush.com/agency/register",
+      reason: "Useful when the page targets design, branding, web design, or marketing services.",
+    },
+    {
+      name: "Sortlist",
+      url: "https://www.sortlist.com/",
+      reason: "Agency marketplace profile for marketing, design, development, and consulting visibility.",
+    },
+  ],
+  ecommerce: [
+    {
+      name: "Shopify Partner Directory",
+      url: "https://www.shopify.com/partners/directory",
+      reason: "Relevant if the page targets Shopify, ecommerce builds, product growth, or store optimization.",
+    },
+    {
+      name: "WooCommerce Experts",
+      url: "https://woocommerce.com/experts/",
+      reason: "Relevant for ecommerce and WooCommerce service authority.",
+    },
+    {
+      name: "Amazon Ads Partner Network",
+      url: "https://advertising.amazon.com/partners",
+      reason: "Useful research target for Amazon or marketplace growth pages.",
+    },
+  ],
+  software: [
+    {
+      name: "Product Hunt",
+      url: "https://www.producthunt.com/",
+      reason: "Good for software/tool launches, feature pages, and public product announcements.",
+    },
+    {
+      name: "G2",
+      url: "https://www.g2.com/",
+      reason: "Relevant for SaaS product profiles and software review credibility.",
+    },
+    {
+      name: "Capterra",
+      url: "https://www.capterra.com/vendors/sign-up",
+      reason: "Useful when the URL is a software/product page and needs category visibility.",
+    },
+  ],
+  content: [
+    {
+      name: "HARO / Connectively alternatives research",
+      url: "https://www.google.com/search?q=journalist+source+request+platforms",
+      reason: "Use expert quotes and journalist requests to earn editorial links to helpful resources.",
+    },
+    {
+      name: "Resource page prospecting",
+      url: "https://www.google.com/search?q=intitle%3Aresources+%22submit%22+industry+guide",
+      reason: "Best for blog guides, checklists, calculators, and educational resources.",
+    },
+    {
+      name: "Guest post prospecting",
+      url: "https://www.google.com/search?q=%22write+for+us%22+marketing+business+blog",
+      reason: "Find relevant editorial blogs where a useful article can reference the target page.",
+    },
+  ],
+};
+
+function googleProspect(name: string, query: string, reason: string) {
+  return {
+    name,
+    url: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+    reason,
+  };
+}
+
+function hostnameFromUrl(pageUrl: string) {
+  try {
+    return new URL(pageUrl).hostname.replace(/^www\./, "");
+  } catch {
+    return pageUrl.replace(/^https?:\/\//, "").split("/")[0].replace(/^www\./, "");
+  }
+}
+
+function pageIntent(pageUrl: string) {
+  const normalized = pageUrl.toLowerCase();
+  if (/\b(area|location|near-me|city|boston|karachi|london|dubai|new-york)\b/.test(normalized)) return "local";
+  if (/\b(package|pricing|cost|quote|plan)\b/.test(normalized)) return "commercial";
+  if (/\b(blog|guide|checklist|how-to|tips|resources|learn)\b/.test(normalized)) return "content";
+  if (/\b(case-study|portfolio|results|work)\b/.test(normalized)) return "proof";
+  if (/\b(shopify|ecommerce|amazon|store|product)\b/.test(normalized)) return "ecommerce";
+  if (/\b(software|platform|tool|app|saas)\b/.test(normalized)) return "software";
+  if (/\b(seo|marketing|agency|web-design|design|development)\b/.test(normalized)) return "agency";
+  return "general";
+}
+
 function authorityResourcesForPage(pageUrl: string) {
   const normalized = pageUrl.toLowerCase();
-  const resources = foundationalAuthorityResources.slice(0, 6);
+  const intent = pageIntent(pageUrl);
+  const pathWords = normalized
+    .replace(/^https?:\/\//, "")
+    .split(/[/?#-]+/)
+    .filter((word) => word.length > 3)
+    .slice(-4)
+    .join(" ");
 
-  if (
-    normalized.includes("web") ||
-    normalized.includes("design") ||
-    normalized.includes("seo") ||
-    normalized.includes("marketing") ||
-    normalized.includes("agency")
-  ) {
+  const generic = [
+    foundationalAuthorityResources[3],
+    foundationalAuthorityResources[4],
+    googleProspect(
+      "Unlinked brand mention search",
+      `"${hostnameFromUrl(pageUrl)}" -site:${hostnameFromUrl(pageUrl)}`,
+      "Find websites already mentioning the brand but not linking to it.",
+    ),
+  ];
+
+  if (intent === "local") {
     return [
-      ...resources,
-      foundationalAuthorityResources.find((resource) => resource.name === "Clutch"),
-      foundationalAuthorityResources.find((resource) => resource.name === "GoodFirms"),
-      foundationalAuthorityResources.find((resource) => resource.name === "DesignRush"),
-      foundationalAuthorityResources.find((resource) => resource.name === "Sortlist"),
-    ].filter(Boolean) as typeof foundationalAuthorityResources;
+      ...authorityResourceGroups.local,
+      googleProspect("Local sponsorship prospects", `${pathWords} sponsors directory local business`, "Find local sponsor/member pages that accept real business listings."),
+      googleProspect("Local resource pages", `${pathWords} resources directory`, "Find city or niche resource pages where the page could be useful."),
+      ...generic,
+    ];
   }
 
-  return resources;
+  if (intent === "commercial") {
+    return [
+      ...authorityResourceGroups.agency,
+      googleProspect("Comparison list prospects", `best ${pathWords} services list`, "Find list-style pages where this service/package page may be a fit."),
+      googleProspect("Buyer guide prospects", `${pathWords} buyer guide resources`, "Find buying guides that may cite a clear pricing or package page."),
+      ...generic,
+    ];
+  }
+
+  if (intent === "content") {
+    return [
+      ...authorityResourceGroups.content,
+      googleProspect("Niche resource pages", `intitle:resources ${pathWords}`, "Find pages that collect helpful educational resources."),
+      googleProspect("Podcast/interview prospects", `${pathWords} podcast interview expert`, "Find podcasts or expert interview pages related to the topic."),
+      ...generic,
+    ];
+  }
+
+  if (intent === "proof") {
+    return [
+      ...authorityResourceGroups.agency,
+      googleProspect("Case study roundup prospects", `${pathWords} case study examples`, "Find pages collecting examples or case studies where proof-based content fits."),
+      googleProspect("Industry publication prospects", `${pathWords} success story industry publication`, "Find publications that may feature real client results."),
+      ...generic,
+    ];
+  }
+
+  if (intent === "ecommerce") {
+    return [
+      ...authorityResourceGroups.ecommerce,
+      googleProspect("Ecommerce resource pages", `${pathWords} ecommerce resources`, "Find ecommerce blogs and resource lists where the page can be cited."),
+      googleProspect("Marketplace partner prospects", `${pathWords} partner directory`, "Find marketplace or tool partner pages relevant to the service."),
+      ...generic,
+    ];
+  }
+
+  if (intent === "software") {
+    return [
+      ...authorityResourceGroups.software,
+      googleProspect("Software alternative pages", `${pathWords} alternatives tools`, "Find comparison pages that may include the product or platform."),
+      googleProspect("Startup directory prospects", `${pathWords} startup directory`, "Find directories and launch lists for product visibility."),
+      ...generic,
+    ];
+  }
+
+  if (intent === "agency") {
+    return [
+      ...authorityResourceGroups.agency,
+      googleProspect("Agency list prospects", `best ${pathWords} agencies`, "Find category and location lists where the service page may belong."),
+      googleProspect("Partner directory prospects", `${pathWords} partner directory`, "Find tool, platform, or service directories relevant to the page."),
+      ...generic,
+    ];
+  }
+
+  return [
+    ...foundationalAuthorityResources.slice(0, 5),
+    googleProspect("Resource page prospects", `intitle:resources ${pathWords}`, "Find resource pages related to the URL topic."),
+    googleProspect("Guest article prospects", `"write for us" ${pathWords}`, "Find editorial sites where a useful article can reference the target page."),
+  ];
 }
 
 function buildBacklinkInsights(pageRows: GscRow[], propertyUrl: string): IntelligenceInsight[] {

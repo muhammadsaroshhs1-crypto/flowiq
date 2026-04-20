@@ -29,6 +29,12 @@ export const dynamic = "force-dynamic";
 type UptimeJson = { isUp?: boolean; responseTimeMs?: number; statusCode?: number };
 type SSLJson = { daysUntilExpiry?: number; expiresAt?: string };
 type CWVJson = { score?: number; lcp?: number; cls?: number; inp?: number };
+type WebsiteContentItem = {
+  type: "Page" | "Post";
+  title: string;
+  url: string;
+  modified?: string;
+};
 
 function asRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -44,6 +50,47 @@ function getLatest<T>(results: Array<{ checkType: string; result: unknown; creat
         result: asRecord(item.result) as T,
       }
     : null;
+}
+
+function readSiteUrl(config: unknown) {
+  const record = asRecord(config);
+  return typeof record.siteUrl === "string" ? record.siteUrl.replace(/\/$/, "") : "";
+}
+
+function titleText(title: unknown) {
+  const record = asRecord(title);
+  return typeof record.rendered === "string"
+    ? record.rendered.replace(/<[^>]+>/g, "").trim()
+    : "Untitled";
+}
+
+async function fetchWordPressContent(siteUrl: string): Promise<WebsiteContentItem[]> {
+  if (!siteUrl) return [];
+
+  const endpoints = [
+    { type: "Page" as const, url: `${siteUrl}/wp-json/wp/v2/pages?per_page=8&_fields=link,title,modified` },
+    { type: "Post" as const, url: `${siteUrl}/wp-json/wp/v2/posts?per_page=8&_fields=link,title,modified` },
+  ];
+
+  const results = await Promise.allSettled(
+    endpoints.map(async (endpoint) => {
+      const response = await fetch(endpoint.url, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
+      });
+
+      if (!response.ok) return [];
+      const items = (await response.json()) as Array<{ link?: string; title?: unknown; modified?: string }>;
+      return items.map<WebsiteContentItem>((item) => ({
+        type: endpoint.type,
+        title: titleText(item.title),
+        url: item.link ?? siteUrl,
+        modified: item.modified,
+      }));
+    }),
+  );
+
+  return results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
 }
 
 export default async function ProjectMonitoringPage({
@@ -83,6 +130,11 @@ export default async function ProjectMonitoringPage({
   const latestSSL = getLatest<SSLJson>(results, "SSL_CHECK");
   const latestCWV = getLatest<CWVJson>(results, "CWV_CHECK");
   const latestBackup = getLatest<{ message?: string }>(results, "BACKUP_CHECK");
+  const websiteIntegration = project.integrations.find(
+    (integration) => integration.isConnected && ["WORDPRESS", "SHOPIFY", "WEBFLOW"].includes(integration.type),
+  );
+  const siteUrl = readSiteUrl(websiteIntegration?.config);
+  const contentItems = websiteIntegration?.type === "WORDPRESS" ? await fetchWordPressContent(siteUrl) : [];
 
   return (
     <section className="space-y-6">
@@ -135,11 +187,57 @@ export default async function ProjectMonitoringPage({
         <CardHeader>
           <CardTitle>Run manual check</CardTitle>
           <CardDescription>
-            Queue a monitoring job from the API. Results appear after the worker processes it.
+            Run a live website check now. Results are saved immediately for this project.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ManualCheckForm projectId={params.projectId} />
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-lg">
+        <CardHeader>
+          <CardTitle>Connected website content</CardTitle>
+          <CardDescription>
+            {siteUrl
+              ? `FlowIQ is reading public WordPress pages and posts from ${siteUrl}.`
+              : "Connect WordPress, Shopify, or Webflow to show website pages here."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {contentItems.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>URL</TableHead>
+                  <TableHead>Modified</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {contentItems.map((item) => (
+                  <TableRow key={`${item.type}-${item.url}`}>
+                    <TableCell><Badge variant="outline">{item.type}</Badge></TableCell>
+                    <TableCell className="font-medium">{item.title}</TableCell>
+                    <TableCell className="max-w-md truncate">
+                      <a href={item.url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                        {item.url}
+                      </a>
+                    </TableCell>
+                    <TableCell>
+                      {item.modified ? formatDistanceToNow(new Date(item.modified), { addSuffix: true }) : "Unknown"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No public WordPress pages were detected yet. Confirm the site URL is correct and that
+              /wp-json/wp/v2/pages is reachable.
+            </p>
+          )}
         </CardContent>
       </Card>
 

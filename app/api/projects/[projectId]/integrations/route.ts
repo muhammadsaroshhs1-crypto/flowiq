@@ -12,7 +12,7 @@ const integrationSchema = z.object({
   config: z.record(z.string(), z.unknown()),
 });
 
-const publicConfigKeys = new Set(["siteUrl", "webhookSecret", "sellerId", "propertyUrl", "shopDomain", "siteId"]);
+const publicConfigKeys = new Set(["siteUrl", "webhookSecret", "sellerId", "marketplaceId", "adsProfileId", "propertyUrl", "shopDomain", "siteId"]);
 
 function splitConfig(config: Record<string, unknown>) {
   const publicConfig: Record<string, unknown> = {};

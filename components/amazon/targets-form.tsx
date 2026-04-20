@@ -96,7 +96,7 @@ export function TargetsForm({
         return;
       }
 
-      toast.success(`${data.suggestionsCreated ?? 0} suggestions created`);
+      toast.success(`${data.suggestionsCreated ?? 0} Amazon actions created`);
       router.refresh();
     } catch {
       toast.error("Could not run analysis");
@@ -179,7 +179,7 @@ export function TargetsForm({
           {isSaving ? "Saving..." : "Save targets"}
         </Button>
         <Button variant="outline" onClick={runAnalysis} disabled={isAnalysing}>
-          {isAnalysing ? "Running analysis..." : "Run analysis"}
+          {isAnalysing ? "Running Amazon audit..." : "Run Amazon audit"}
         </Button>
       </div>
     </div>

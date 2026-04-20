@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 
+import { AmazonBrandCommandCenter } from "@/components/amazon/brand-command-center";
 import { SuggestionCard } from "@/components/amazon/suggestion-card";
 import { TargetsForm } from "@/components/amazon/targets-form";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import { getMockAmazonCampaigns, getMockAmazonListings } from "@/lib/mock-amazon
 import { prisma } from "@/lib/prisma";
 import { getProjectById } from "@/lib/projects";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { getAmazonBrandCommandCenter } from "@/services/amazon-brand-intelligence";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,12 @@ type AmazonPageProps = {
 const suggestionTypes = ["ALL", "BID_ADJUST", "NEGATIVE_KEYWORD", "LISTING_OPTIMIZATION"] as const;
 const priorities = ["ALL", "HIGH", "MEDIUM", "LOW"] as const;
 const statuses = ["PENDING", "APPROVED", "REJECTED"] as const;
+
+function configObject(config: unknown) {
+  return config && typeof config === "object" && !Array.isArray(config)
+    ? (config as { sellerId?: string })
+    : {};
+}
 
 export default async function AmazonPage({ params, searchParams }: AmazonPageProps) {
   const { userId } = await auth();
@@ -74,6 +82,17 @@ export default async function AmazonPage({ params, searchParams }: AmazonPagePro
   const targets = (project.targets ?? {}) as AmazonTargets;
   const listings = getMockAmazonListings();
   const campaigns = getMockAmazonCampaigns();
+  const amazonIntegration = await prisma.projectIntegration.findUnique({
+    where: {
+      projectId_type: {
+        projectId: params.projectId,
+        type: "AMAZON",
+      },
+    },
+  });
+  const amazonConfig = configObject(amazonIntegration?.config);
+  const isAmazonConnected = Boolean(amazonIntegration?.isConnected);
+  const brandCommandCenter = getAmazonBrandCommandCenter(targets, campaigns, listings);
   const totalSpend = campaigns.reduce((sum, campaign) => sum + campaign.spend, 0);
   const totalSales = campaigns.reduce((sum, campaign) => sum + campaign.sales, 0);
   const totalClicks = campaigns.reduce((sum, campaign) => sum + campaign.clicks, 0);
@@ -90,14 +109,25 @@ export default async function AmazonPage({ params, searchParams }: AmazonPagePro
         <h1 className="text-2xl font-semibold tracking-tight">Amazon intelligence</h1>
       </div>
 
-      <Tabs defaultValue="targets" className="space-y-4">
+      <Tabs defaultValue="brand" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="brand">Brand command</TabsTrigger>
           <TabsTrigger value="targets">Targets</TabsTrigger>
           <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
           <TabsTrigger value="listings">Listings</TabsTrigger>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="brand">
+          <AmazonBrandCommandCenter
+            projectId={params.projectId}
+            brandName={project.clientName ?? project.name}
+            commandCenter={brandCommandCenter}
+            isAmazonConnected={isAmazonConnected}
+            sellerId={amazonConfig.sellerId}
+          />
+        </TabsContent>
 
         <TabsContent value="targets">
           <Card className="rounded-lg">
@@ -150,11 +180,18 @@ export default async function AmazonPage({ params, searchParams }: AmazonPagePro
           ) : (
             <Card className="rounded-lg border-dashed">
               <CardHeader>
-                <CardTitle>No suggestions found</CardTitle>
+                <CardTitle>No pending Amazon suggestions yet</CardTitle>
                 <CardDescription>
-                  Run analysis from the Targets tab after connecting Amazon Seller Central.
+                  Connect Amazon from Integrations, then run analysis from Targets. FlowIQ will create bid, negative keyword, and listing optimization actions for approval.
                 </CardDescription>
               </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                <Badge variant={isAmazonConnected ? "outline" : "destructive"}>
+                  {isAmazonConnected ? "Amazon connected" : "Amazon connection required"}
+                </Badge>
+                <Badge variant="outline">Brand command center ready</Badge>
+                <Badge variant="outline">Suggestions generated after analysis</Badge>
+              </CardContent>
             </Card>
           )}
         </TabsContent>

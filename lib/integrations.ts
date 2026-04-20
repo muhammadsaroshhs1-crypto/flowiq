@@ -43,14 +43,19 @@ export const INTEGRATION_REGISTRY: Record<IntegrationType, IntegrationRegistryIt
   },
   AMAZON: {
     name: "Amazon Seller Central",
-    description: "Listings, ads, inventory, orders",
+    description: "Seller Central, ads, listing quality, inventory, and order signals",
     category: "MARKETPLACE",
     icon: "shopping-cart",
     authType: "api_key",
-    supportLevel: "mock_validation",
+    supportLevel: "manual_validation",
     unlocks: ["amazon_intelligence", "listing_monitoring", "bid_suggestions"],
-    setupSteps: ["Add FlowIQ as a Selling Partner API app", "Enter Seller ID + MWS credentials"],
-    credentialFields: ["sellerId", "marketplaceId", "refreshToken"],
+    setupSteps: [
+      "Use sandbox credentials for the pitch/demo flow",
+      "Enter Seller ID, marketplace ID, and refresh token",
+      "FlowIQ validates seller ID format and unlocks the Amazon command center",
+      "Production SP-API approval replaces sandbox data with live Seller Central and Ads data",
+    ],
+    credentialFields: ["sellerId", "marketplaceId", "refreshToken", "adsProfileId"],
   },
   GOOGLE_ANALYTICS: {
     name: "Google Analytics",

@@ -12,6 +12,7 @@ const baseTabs = [
   { href: "/pipelines", label: "Pipelines" },
   { href: "/search-intelligence", label: "SEO + Analytics" },
   { href: "/intelligence", label: "Intelligence" },
+  { href: "/reports", label: "Reports" },
   { href: "/integrations", label: "Integrations" },
 ];
 
@@ -46,7 +47,7 @@ export default async function ProjectLayout({
       : null,
   ].filter(Boolean) as Array<{ href: string; label: string }>;
 
-  const tabs = [...baseTabs.slice(0, 4), ...industryTabs, baseTabs[4]];
+  const tabs = [...baseTabs.slice(0, 5), ...industryTabs, baseTabs[5]];
 
   return (
     <ProjectProvider
